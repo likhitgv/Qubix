@@ -1,1 +1,11 @@
-crop_name,season,soil_type,min_temperature,max_temperature,water_requirement
+date,location,latitude,longitude,temperature_c,rainfall_mm,source
+2026-06-01,Ballari,15.1394,76.9214,32.5,2.4,SAMPLE
+2026-06-02,Ballari,15.1394,76.9214,33.1,0.0,SAMPLE
+2026-06-03,Ballari,15.1394,76.9214,31.8,5.2,SAMPLE
+2026-06-04,Ballari,15.1394,76.9214,30.5,12.6,SAMPLE
+2026-06-05,Ballari,15.1394,76.9214,29.8,18.4,SAMPLE
+2026-06-06,Ballari,15.1394,76.9214,30.2,8.1,SAMPLE
+2026-06-07,Ballari,15.1394,76.9214,32.0,0.0,SAMPLE
+2026-06-08,Ballari,15.1394,76.9214,33.4,0.0,SAMPLE
+2026-06-09,Ballari,15.1394,76.9214,31.2,6.5,SAMPLE
+2026-06-10,Ballari,15.1394,76.9214,28.9,22.3,SAMPLE
