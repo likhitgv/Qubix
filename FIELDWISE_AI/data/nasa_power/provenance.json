@@ -1,0 +1,202 @@
+{
+  "Ballari": {
+    "latitude": 15.1394,
+    "longitude": 76.9214,
+    "source": "NASA POWER",
+    "api_endpoint": "https://power.larc.nasa.gov/api/temporal/daily/point",
+    "data_nature": "NASA POWER is a gridded product derived from satellite observations and reanalysis models (e.g. MERRA-2). Values describe a grid cell; they are not direct field or weather-station measurements.",
+    "retrieved_at": "2026-11-14T10:20:31+00:00",
+    "start_date": "2025-01-01",
+    "end_date": "2025-01-31",
+    "units": {
+      "T2M": "C",
+      "T2M_MAX": "C",
+      "T2M_MIN": "C",
+      "PRECTOTCORR": "mm/day",
+      "RH2M": "%",
+      "ALLSKY_SFC_SW_DWN": "MJ/m^2/day"
+    },
+    "descriptions": {
+      "T2M": "Temperature at 2 Meters",
+      "T2M_MAX": "Temperature at 2 Meters Maximum",
+      "T2M_MIN": "Temperature at 2 Meters Minimum",
+      "PRECTOTCORR": "Precipitation Corrected",
+      "RH2M": "Relative Humidity at 2 Meters",
+      "ALLSKY_SFC_SW_DWN": "All Sky Surface Shortwave Downward Irradiance"
+    },
+    "missing_counts": {
+      "T2M": 0,
+      "T2M_MAX": 0,
+      "T2M_MIN": 0,
+      "PRECTOTCORR": 0,
+      "RH2M": 0,
+      "ALLSKY_SFC_SW_DWN": 0
+    },
+    "is_sample_data": false,
+    "processing_steps": [
+      "Requested daily point data from NASA POWER API (JSON, UTC).",
+      "Merged per-parameter series by date.",
+      "Converted fill value -999 and null to None (missing)."
+    ]
+  },
+  "Shivamogga": {
+    "latitude": 13.9326,
+    "longitude": 75.575,
+    "source": "NASA POWER",
+    "api_endpoint": "https://power.larc.nasa.gov/api/temporal/daily/point",
+    "data_nature": "NASA POWER is a gridded product derived from satellite observations and reanalysis models (e.g. MERRA-2). Values describe a grid cell; they are not direct field or weather-station measurements.",
+    "retrieved_at": "2026-11-14T10:20:33+00:00",
+    "start_date": "2025-01-01",
+    "end_date": "2025-01-31",
+    "units": {
+      "T2M": "C",
+      "T2M_MAX": "C",
+      "T2M_MIN": "C",
+      "PRECTOTCORR": "mm/day",
+      "RH2M": "%",
+      "ALLSKY_SFC_SW_DWN": "MJ/m^2/day"
+    },
+    "descriptions": {
+      "T2M": "Temperature at 2 Meters",
+      "T2M_MAX": "Temperature at 2 Meters Maximum",
+      "T2M_MIN": "Temperature at 2 Meters Minimum",
+      "PRECTOTCORR": "Precipitation Corrected",
+      "RH2M": "Relative Humidity at 2 Meters",
+      "ALLSKY_SFC_SW_DWN": "All Sky Surface Shortwave Downward Irradiance"
+    },
+    "missing_counts": {
+      "T2M": 0,
+      "T2M_MAX": 0,
+      "T2M_MIN": 0,
+      "PRECTOTCORR": 0,
+      "RH2M": 0,
+      "ALLSKY_SFC_SW_DWN": 0
+    },
+    "is_sample_data": false,
+    "processing_steps": [
+      "Requested daily point data from NASA POWER API (JSON, UTC).",
+      "Merged per-parameter series by date.",
+      "Converted fill value -999 and null to None (missing)."
+    ]
+  },
+  "Vijayapura": {
+    "latitude": 16.8275,
+    "longitude": 75.7253,
+    "source": "NASA POWER",
+    "api_endpoint": "https://power.larc.nasa.gov/api/temporal/daily/point",
+    "data_nature": "NASA POWER is a gridded product derived from satellite observations and reanalysis models (e.g. MERRA-2). Values describe a grid cell; they are not direct field or weather-station measurements.",
+    "retrieved_at": "2026-11-14T10:20:34+00:00",
+    "start_date": "2025-01-01",
+    "end_date": "2025-01-31",
+    "units": {
+      "T2M": "C",
+      "T2M_MAX": "C",
+      "T2M_MIN": "C",
+      "PRECTOTCORR": "mm/day",
+      "RH2M": "%",
+      "ALLSKY_SFC_SW_DWN": "MJ/m^2/day"
+    },
+    "descriptions": {
+      "T2M": "Temperature at 2 Meters",
+      "T2M_MAX": "Temperature at 2 Meters Maximum",
+      "T2M_MIN": "Temperature at 2 Meters Minimum",
+      "PRECTOTCORR": "Precipitation Corrected",
+      "RH2M": "Relative Humidity at 2 Meters",
+      "ALLSKY_SFC_SW_DWN": "All Sky Surface Shortwave Downward Irradiance"
+    },
+    "missing_counts": {
+      "T2M": 0,
+      "T2M_MAX": 0,
+      "T2M_MIN": 0,
+      "PRECTOTCORR": 0,
+      "RH2M": 0,
+      "ALLSKY_SFC_SW_DWN": 0
+    },
+    "is_sample_data": false,
+    "processing_steps": [
+      "Requested daily point data from NASA POWER API (JSON, UTC).",
+      "Merged per-parameter series by date.",
+      "Converted fill value -999 and null to None (missing)."
+    ]
+  },
+  "Belagavi": {
+    "latitude": 15.8521,
+    "longitude": 74.5045,
+    "source": "NASA POWER",
+    "api_endpoint": "https://power.larc.nasa.gov/api/temporal/daily/point",
+    "data_nature": "NASA POWER is a gridded product derived from satellite observations and reanalysis models (e.g. MERRA-2). Values describe a grid cell; they are not direct field or weather-station measurements.",
+    "retrieved_at": "2026-11-14T10:20:35+00:00",
+    "start_date": "2025-01-01",
+    "end_date": "2025-01-31",
+    "units": {
+      "T2M": "C",
+      "T2M_MAX": "C",
+      "T2M_MIN": "C",
+      "PRECTOTCORR": "mm/day",
+      "RH2M": "%",
+      "ALLSKY_SFC_SW_DWN": "MJ/m^2/day"
+    },
+    "descriptions": {
+      "T2M": "Temperature at 2 Meters",
+      "T2M_MAX": "Temperature at 2 Meters Maximum",
+      "T2M_MIN": "Temperature at 2 Meters Minimum",
+      "PRECTOTCORR": "Precipitation Corrected",
+      "RH2M": "Relative Humidity at 2 Meters",
+      "ALLSKY_SFC_SW_DWN": "All Sky Surface Shortwave Downward Irradiance"
+    },
+    "missing_counts": {
+      "T2M": 0,
+      "T2M_MAX": 0,
+      "T2M_MIN": 0,
+      "PRECTOTCORR": 0,
+      "RH2M": 0,
+      "ALLSKY_SFC_SW_DWN": 0
+    },
+    "is_sample_data": false,
+    "processing_steps": [
+      "Requested daily point data from NASA POWER API (JSON, UTC).",
+      "Merged per-parameter series by date.",
+      "Converted fill value -999 and null to None (missing)."
+    ]
+  },
+  "Dharwad": {
+    "latitude": 15.4589,
+    "longitude": 75.0078,
+    "source": "NASA POWER",
+    "api_endpoint": "https://power.larc.nasa.gov/api/temporal/daily/point",
+    "data_nature": "NASA POWER is a gridded product derived from satellite observations and reanalysis models (e.g. MERRA-2). Values describe a grid cell; they are not direct field or weather-station measurements.",
+    "retrieved_at": "2026-11-14T10:20:37+00:00",
+    "start_date": "2025-01-01",
+    "end_date": "2025-01-31",
+    "units": {
+      "T2M": "C",
+      "T2M_MAX": "C",
+      "T2M_MIN": "C",
+      "PRECTOTCORR": "mm/day",
+      "RH2M": "%",
+      "ALLSKY_SFC_SW_DWN": "MJ/m^2/day"
+    },
+    "descriptions": {
+      "T2M": "Temperature at 2 Meters",
+      "T2M_MAX": "Temperature at 2 Meters Maximum",
+      "T2M_MIN": "Temperature at 2 Meters Minimum",
+      "PRECTOTCORR": "Precipitation Corrected",
+      "RH2M": "Relative Humidity at 2 Meters",
+      "ALLSKY_SFC_SW_DWN": "All Sky Surface Shortwave Downward Irradiance"
+    },
+    "missing_counts": {
+      "T2M": 0,
+      "T2M_MAX": 0,
+      "T2M_MIN": 0,
+      "PRECTOTCORR": 0,
+      "RH2M": 0,
+      "ALLSKY_SFC_SW_DWN": 0
+    },
+    "is_sample_data": false,
+    "processing_steps": [
+      "Requested daily point data from NASA POWER API (JSON, UTC).",
+      "Merged per-parameter series by date.",
+      "Converted fill value -999 and null to None (missing)."
+    ]
+  }
+}
