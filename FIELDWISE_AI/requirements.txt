@@ -1,1 +1,1 @@
-# Add project dependencies here, one per line.
+requests>=2.31.0
