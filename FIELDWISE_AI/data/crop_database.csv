@@ -1,11 +1,5 @@
-date,location,latitude,longitude,temperature_c,rainfall_mm,source
-2026-06-01,Ballari,15.1394,76.9214,32.5,2.4,SAMPLE
-2026-06-02,Ballari,15.1394,76.9214,33.1,0.0,SAMPLE
-2026-06-03,Ballari,15.1394,76.9214,31.8,5.2,SAMPLE
-2026-06-04,Ballari,15.1394,76.9214,30.5,12.6,SAMPLE
-2026-06-05,Ballari,15.1394,76.9214,29.8,18.4,SAMPLE
-2026-06-06,Ballari,15.1394,76.9214,30.2,8.1,SAMPLE
-2026-06-07,Ballari,15.1394,76.9214,32.0,0.0,SAMPLE
-2026-06-08,Ballari,15.1394,76.9214,33.4,0.0,SAMPLE
-2026-06-09,Ballari,15.1394,76.9214,31.2,6.5,SAMPLE
-2026-06-10,Ballari,15.1394,76.9214,28.9,22.3,SAMPLE
+crop_name,season,soil_type,min_temperature,max_temperature,water_requirement
+crop_id,crop_name,crop_family,suitable_seasons,soil_types,min_temperature_c,max_temperature_c,min_rainfall_mm,max_rainfall_mm,water_requirement,legume,rotation_notes,source_name,source_urls,source_accessed_date,source_notes
+ragi,Finger millet,Poaceae,kharif,alluvial|loamy|sandy,26,30,450,500,rainfed,false,Cereal crop; rotation benefits require separate local evidence,ICAR Indian Institute of Millets Research and TNAU Agritech Portal,https://www.millets.res.in/pub/2026/GAP-English.pdf|https://icar.gov.in/sites/default/files/2025-12/October_2025%20Indian%20Farming.pdf|https://agritech.tnau.ac.in/CropProduction/Millets/millets_ragi.html,2026-11-14,Temperature is the cited optimum growth range; rainfall is the TNAU optimum for rainfed ragi. Soil types are cited as suitable when well drained.
+pigeonpea,Pigeonpea,Fabaceae,kharif,sandy-loam|loam,20,40,500,1000,rainfed,true,Legume crop; rotation benefits require separate local evidence,CBSE Basic Agriculture study material,https://cbseacademic.nic.in/web_material/Curriculum/Vocational/2017/Basic_Agriculture_X.pdf,2026-11-14,The source states the temperature and rainfall ranges and identifies deep well-drained sandy-loam to loam soil as ideal.
+sorghum,Sorghum,Poaceae,kharif|rabi,red-soil|black-soil,26,30,400,1000,rainfed,false,Cereal crop; rotation benefits require separate local evidence,ICAR Indian Institute of Millets Research,https://www.millets.res.in/pub/2026/GAP-English.pdf,2026-11-14,Temperature is the cited optimum growth range. Rainfall is the cited successful seasonal range of 40 to 100 cm converted to 400 to 1000 mm. Soil types are the cited conducive Alfisols red soil and Vertisols black soil.
