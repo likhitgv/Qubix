@@ -1,56 +1,69 @@
+"""
+Usage example for modules/nasa_api.py.
 
-import csv
+Run from the project root:
+    py -3.11 -m examples.nasa_power_demo
+
+Fetches January 2025 NASA POWER daily data for every configured district,
+saves one CSV per district (+ a combined CSV and a provenance JSON), and
+shows the hand-off to Member 2's data_analysis module.
+"""
+
+import json
 from pathlib import Path
 
-from modules.nasa_api import fetch_for_locations
+import pandas as pd
 
-KARNATAKA_LOCATIONS = {
-    "Ballari": (15.1394, 76.9214),
-    "Shivamogga": (13.9326, 75.5750),
-    "Vijayapura": (16.8275, 75.7253),
-    "Belagavi": (15.8521, 74.5045),
-    "Dharwad": (15.4589, 75.0078),
-}
+from config.districts import get_locations
+from modules.data_analysis import clean_climate_data, generate_climate_summary
+from modules.nasa_api import (
+    NASAPowerError,
+    fetch_for_locations,
+    to_climate_dataframe,
+)
 
-OUTPUT_DIR = Path("data/nasa_power")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "data" / "nasa_power"
+START, END = "2025-01-01", "2025-01-31"
 
-if __name__ == "__main__":
+
+def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    results = fetch_for_locations(
-        locations=KARNATAKA_LOCATIONS,
-        start_date="2025-01-01",
-        end_date="2025-01-31",
-    )
+    try:
+        results = fetch_for_locations(get_locations(), START, END)
+    except NASAPowerError as exc:
+        print(f"NASA POWER unavailable: {exc}")
+        print("Use modules.nasa_api.load_sample_data() and label it SAMPLE.")
+        return
+
+    frames = []
+    provenance = {}
 
     for name, result in results.items():
-        filename = OUTPUT_DIR / f"{name.lower()}_2025-01.csv"
+        df = to_climate_dataframe(result, name)
+        df.drop(columns=["temperature_c", "rainfall_mm", "source"]).to_csv(
+            OUTPUT_DIR / f"{name.lower()}_2025-01.csv", index=False
+        )
+        frames.append(df)
+        provenance[name] = {
+            "latitude": result["latitude"],
+            "longitude": result["longitude"],
+            **result["metadata"],
+        }
+        print(f"{name}: {len(df)} records")
 
-        records = result["records"]
+    combined = pd.concat(frames, ignore_index=True)
+    combined.to_csv(OUTPUT_DIR / "nasa_power_consolidated.csv", index=False)
 
-        fieldnames = [
-            "location",
-            "latitude",
-            "longitude",
-            "date",
-            "T2M",
-            "T2M_MAX",
-            "T2M_MIN",
-            "PRECTOTCORR",
-            "RH2M",
-            "ALLSKY_SFC_SW_DWN",
-        ]
+    with (OUTPUT_DIR / "provenance.json").open("w", encoding="utf-8") as f:
+        json.dump(provenance, f, indent=2)
 
-        with filename.open("w", newline="", encoding="utf-8") as file:
-            writer = csv.DictWriter(file, fieldnames=fieldnames)
-            writer.writeheader()
+    # Hand-off check: Member 2's cleaner accepts our DataFrame as-is.
+    cleaned, quality_report = clean_climate_data(frames[0])
+    print(quality_report)
+    print(generate_climate_summary(cleaned))
 
-            for record in records:
-                writer.writerow({
-                    "location": name,
-                    "latitude": result["latitude"],
-                    "longitude": result["longitude"],
-                    **record,
-                })
 
-        print(f"{name}: {len(records)} records saved to {filename}")
+if __name__ == "__main__":
+    main()
