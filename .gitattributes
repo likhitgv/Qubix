@@ -1,0 +1,4 @@
+FIELDWISE_AI/data/india_grid_2021_2025/processed/india_meteorological_daily.csv filter=lfs diff=lfs merge=lfs -text
+FIELDWISE_AI/data/india_grid_2021_2025/processed/india_combined_2021_2026/india_meteorological_daily_2021_2026.csv filter=lfs diff=lfs merge=lfs -text
+FIELDWISE_AI/data/india_grid_2021_2025/processed/india_solar_daily.csv filter=lfs diff=lfs merge=lfs -text
+FIELDWISE_AI/data/india_grid_2021_2025/processed/india_clipped/india_meteorological_daily.csv filter=lfs diff=lfs merge=lfs -text

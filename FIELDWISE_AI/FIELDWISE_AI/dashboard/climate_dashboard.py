@@ -1,0 +1,1 @@
+"""Climate data dashboard components."""
