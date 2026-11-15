@@ -7,6 +7,7 @@ UI only: all data handling and scoring lives in modules/.
 from __future__ import annotations
 
 import re
+import sqlite3
 from datetime import date
 from html import escape
 
@@ -29,6 +30,7 @@ from dashboard.map_view import build_map
 from dashboard.theme import ACCENT, ACCENT_2, ACCENT_3, inject_theme, plot_layout
 from modules import advisor
 from modules import kairo_service as svc
+from modules import storage
 from modules.crop_database import load_crop_database
 from modules.crop_suitability_v2 import WEIGHTS
 from modules.sustainability import INDICATOR_NOTE
@@ -104,11 +106,43 @@ def _goto(page: str) -> None:
     st.session_state["_nav"] = page
 
 
+def _open_saved(plan_id: int) -> None:
+    loaded = storage.load_plan(plan_id)
+    if loaded:
+        st.session_state.profile, st.session_state.plan = loaded
+        st.session_state["_nav"] = "Recommendations"
+
+
+def _delete_saved(plan_id: int) -> None:
+    storage.delete_plan(plan_id)
+
+
+def _saved_plans_panel(expanded: bool = False) -> None:
+    """List recent saved recommendations (SQLite) with Open and Delete."""
+    try:
+        rows = storage.list_plans(10)
+    except (OSError, sqlite3.Error):
+        return  # storage is a convenience; never block the main journey
+    if not rows:
+        return
+    with st.expander(f"Your saved plans ({len(rows)})", expanded=expanded):
+        for r in rows:
+            c1, c2, c3 = st.columns([6, 1.3, 1.3], vertical_alignment="center")
+            score = f" · fit score {r['top_score']:.0f}" if r["top_score"] is not None else ""
+            c1.markdown(
+                f"**{r['place']}** · {r['soil_label'] or 'Soil not given'} · {r['water_label'] or 'Water not given'}  \n"
+                f"{r['top_rotation'] or 'No plan'}{score} · saved {r['created_at'][:10]}"
+            )
+            c2.button("Open", key=f"open_{r['id']}", on_click=_open_saved, args=(r["id"],))
+            c3.button("Delete", key=f"del_{r['id']}", on_click=_delete_saved, args=(r["id"],))
+
+
 def _need_plan() -> dict | None:
     plan = st.session_state.plan
     if not plan:
         ui.empty_state("Add your field details first", "KAIRO needs your location, soil and water to suggest a plan.")
         st.button("Add your field details", type="primary", on_click=_goto, args=("Farm",), key=f"need_{st.session_state.get('page')}")
+        _saved_plans_panel(expanded=True)
     return plan
 
 
@@ -311,6 +345,10 @@ def page_farm() -> None:
             return
         st.session_state.profile = profile
         st.session_state.plan = plan
+        try:
+            storage.save_plan(profile, plan)
+        except (OSError, sqlite3.Error):
+            pass  # the plan still shows; it just is not remembered
         st.session_state["_nav"] = "Recommendations"
         st.rerun()
 
@@ -462,6 +500,7 @@ def page_recommendations() -> None:
         file_name=f"kairo_{_slug(plan['district'])}_{date.today().isoformat()}.csv",
         mime="text/csv",
     )
+    _saved_plans_panel()
     _footer()
 
 

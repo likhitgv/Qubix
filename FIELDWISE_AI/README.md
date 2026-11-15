@@ -95,3 +95,10 @@ py -3.11 -m examples.build_india_seasonal_summary
 py -3.11 -m pip install pyshp
 py -3.11 -m examples.build_india_districts <path-to>/2011_Dist
 ```
+
+## Saved plans (SQLite)
+
+Every recommendation is saved to a local SQLite file, `data/kairo.db` (created automatically,
+ignored by git). Open or delete earlier plans from "Your saved plans" on the Recommendation page.
+Set `KAIRO_DB_PATH` to store the file somewhere else. Only the field answers and the computed
+plan are stored; the crop and climate reference data remain CSV files.

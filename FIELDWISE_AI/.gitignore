@@ -5,3 +5,7 @@ __pycache__/
 
 # Raw NASA GPM satellite files
 *.nc4
+
+# Local SQLite database (saved plans)
+data/kairo.db
+data/kairo.db-journal

@@ -238,6 +238,71 @@ class StateDistrictTests(unittest.TestCase):
         self.assertIn(widget(at.selectbox, "District").value, widget(at.selectbox, "District").options)
 
 
+class SavedPlansTests(unittest.TestCase):
+    """Plans are remembered in SQLite; each test uses its own throw-away database."""
+
+    def setUp(self):
+        import tempfile
+        self._dir = tempfile.TemporaryDirectory()
+        self._env = mock.patch.dict(os.environ, {"KAIRO_DB_PATH": os.path.join(self._dir.name, "t.db")})
+        self._env.start()
+
+    def tearDown(self):
+        self._env.stop()
+        self._dir.cleanup()
+
+    def test_getting_a_recommendation_saves_it(self):
+        from modules import storage
+        at = fresh()
+        generate(at)
+        self.assertFalse(at.exception, at.exception)
+        rows = storage.list_plans()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["place"], "Ballari")
+        self.assertEqual(rows[0]["soil_label"], "Sandy loam")
+
+    def test_saved_plans_panel_appears_on_the_recommendation_page(self):
+        at = fresh()
+        generate(at)
+        self.assertTrue(any("Your saved plans" in e.label for e in at.expander))
+
+    def test_open_restores_a_saved_plan_in_a_new_session(self):
+        generate(fresh())                     # saves one plan, then the session ends
+        at = fresh()                          # new session: nothing loaded
+        go(at, "Recommendations")
+        self.assertIn("Add your field details first", page_text(at))
+        [b for b in at.button if b.label == "Open"][0].click()
+        at.run()
+        self.assertFalse(at.exception, at.exception)
+        self.assertEqual(at.session_state["page"], "Recommendations")
+        self.assertEqual(at.session_state["plan"]["district"], "Ballari")
+        self.assertTrue(at.session_state["plan"]["rotations"])
+        self.assertEqual(at.session_state["profile"]["soil_label"], "Sandy loam")
+
+    def test_delete_removes_the_plan(self):
+        from modules import storage
+        at = fresh()
+        generate(at)
+        [b for b in at.button if b.label == "Delete"][0].click()
+        at.run()
+        self.assertEqual(storage.count_plans(), 0)
+
+    def test_each_recommendation_adds_a_row(self):
+        from modules import storage
+        at = fresh()
+        generate(at)
+        generate(at, soil="Red soil")
+        self.assertEqual(storage.count_plans(), 2)
+
+    def test_broken_database_never_blocks_the_recommendation(self):
+        with mock.patch.dict(os.environ, {"KAIRO_DB_PATH": self._dir.name}):   # a folder, not a file
+            at = fresh()
+            generate(at)
+        self.assertFalse(at.exception, at.exception)
+        self.assertTrue(at.session_state["plan"]["rotations"])
+        self.assertEqual(at.session_state["page"], "Recommendations")
+
+
 class AdvisorTests(unittest.TestCase):
     def _no_key_env(self):
         env = {k: v for k, v in os.environ.items() if not k.endswith("_API_KEY")}
