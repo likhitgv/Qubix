@@ -1,30 +1,34 @@
 """KAIRO design system: calm, warm, readable. Earth tones, one green for actions.
 
-Palette (contrast checked against the paper background):
-  paper   #F6F2EA   page background (warm off-white)
-  surface #FFFFFF   cards and inputs
-  line    #E2DACB   borders
-  ink     #2B2A26   text            (about 12:1 on paper)
-  muted   #66604F   secondary text  (about 5.5:1 on paper)
-  green   #2F6B3A   primary action  (white text about 6.4:1)
-  clay    #A4673A   soil / secondary accent
-  water   #3F7387   water / weather accent
-  amber   #FBF3E0 / #5E4413 / #C98B2B   gentle caution
+Palette: "natural and trustworthy" (classic agrarian).
+  paper   #F8F3E6   cream page background
+  surface #FFFCF3   warm cream cards and inputs (no stark white)
+  beige   #EFE6D2   secondary surface
+  line    #E3D9C0   borders
+  ink     #2A2A22   text
+  muted   #5F5A48   secondary text
+  forest  #1F4D2B   deep forest green: brand, headings, selected options
+  sage    #8FA98A / #E1E9D8   soft green tints
+  wheat   #E3A82B   accent for primary buttons, highlights, badges (text on it: #1B3A22)
+  clay    #A4673A   soil;  water #3F7387   rain
+  amber   #FBF0D6 / #5E4413 / #C98B2B   gentle caution
 """
 
 import streamlit as st
 
-GREEN = "#2F6B3A"
-GREEN_SOFT = "#E3EDDC"
+GREEN = "#1F4D2B"        # deep forest green: brand, headings, selected options
+GREEN_SOFT = "#E1E9D8"   # sage tint: selected backgrounds
+SAGE = "#8FA98A"
+WHEAT = "#E3A82B"        # wheat / amber: primary buttons, highlights, badges
+ON_WHEAT = "#1B3A22"     # dark forest text used on wheat
 CLAY = "#A4673A"
 WATER = "#3F7387"
-SAND = "#D8BE7A"
-INK = "#2B2A26"
+INK = "#2A2A22"
 
-# Kept for chart code that imports these names.
+# Chart colour roles (names kept for existing chart code).
 ACCENT = GREEN
 ACCENT_2 = WATER
-ACCENT_3 = CLAY
+ACCENT_3 = WHEAT
 
 PLOT_LAYOUT = dict(
     template="plotly_white",
@@ -53,9 +57,10 @@ _CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&family=Source+Serif+4:wght@500;600;700&display=swap');
 :root{
-  --paper:#F6F2EA; --surface:#FFFFFF; --line:#E2DACB; --line-strong:#CFC5B0;
-  --ink:#2B2A26; --muted:#66604F; --green:#2F6B3A; --green-dark:#25562F; --green-soft:#E3EDDC;
-  --clay:#A4673A; --water:#3F7387; --amber-bg:#FBF3E0; --amber-ink:#5E4413; --amber-line:#C98B2B;
+  --paper:#F8F3E6; --surface:#FFFCF3; --line:#E3D9C0; --line-strong:#D2C6A6;
+  --ink:#2A2A22; --muted:#5F5A48; --green:#1F4D2B; --green-dark:#173C21; --green-soft:#E1E9D8; --sage:#8FA98A;
+  --wheat:#E3A82B; --wheat-dark:#CF931A; --on-wheat:#1B3A22;
+  --clay:#A4673A; --water:#3F7387; --amber-bg:#FBF0D6; --amber-ink:#5E4413; --amber-line:#C98B2B;
   --serif:'Source Serif 4',Georgia,serif; --sans:'Source Sans 3',system-ui,sans-serif;
 }
 html,body,[class*="css"],.stApp{font-family:var(--sans);}
@@ -109,8 +114,9 @@ a{color:var(--green);}
 
 /* recommendation */
 .eyebrow{font-size:.8rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--green);}
-.reco{background:var(--surface);border:1px solid var(--line-strong);border-left:6px solid var(--green);
+.reco{background:var(--surface);border:1px solid var(--line-strong);border-left:6px solid var(--wheat);
   border-radius:10px;padding:1.6rem 1.8rem;margin:.4rem 0 1.2rem;}
+.reco .eyebrow{display:inline-block;background:var(--wheat);color:var(--on-wheat);padding:.18rem .6rem;border-radius:4px;}
 .reco .plan{font-family:var(--serif);font-size:2.1rem;font-weight:600;line-height:1.25;margin:.35rem 0 .2rem;}
 .reco .plan span{color:var(--muted);font-size:1.15rem;font-weight:500;}
 .reco .fit{color:var(--muted);margin-bottom:1rem;}
@@ -124,7 +130,7 @@ a{color:var(--green);}
 .alt .t{font-family:var(--serif);font-size:1.3rem;font-weight:600;line-height:1.3;margin:.25rem 0 .2rem;}
 .alt .m{color:var(--muted);font-size:.95rem;}
 .weather{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:.9rem;margin:.2rem 0 1.2rem;}
-.weather > div{border-top:2px solid var(--line-strong);padding-top:.5rem;}
+.weather > div{border-top:2px solid var(--sage);padding-top:.5rem;}
 .weather .k{color:var(--muted);font-size:.88rem;}
 .weather .v{font-family:var(--serif);font-size:1.5rem;font-weight:600;}
 .weather .s{color:var(--muted);font-size:.88rem;}
@@ -132,9 +138,9 @@ a{color:var(--green);}
 /* score bars (inside "How this was calculated") */
 .bar{display:grid;grid-template-columns:100px 1fr 34px;gap:.6rem;align-items:center;margin:.35rem 0;font-size:.92rem;}
 .bar .nm{color:var(--muted);text-transform:capitalize;}
-.bar .track{height:8px;border-radius:4px;background:#ECE5D6;overflow:hidden;}
+.bar .track{height:8px;border-radius:4px;background:#EADFC4;overflow:hidden;}
 .bar .track i{display:block;height:100%;background:var(--green);}
-.bar .track i.mid{background:#C79A3B;}
+.bar .track i.mid{background:var(--wheat);}
 .bar .track i.low{background:#B5543F;}
 .bar b{text-align:right;font-weight:600;}
 
@@ -161,9 +167,10 @@ a{color:var(--green);}
 div[data-testid="stVerticalBlockBorderWrapper"]{border-color:var(--line)!important;border-radius:10px;background:var(--surface);}
 /* primary action: the only rounded, filled button */
 button[kind="primary"],button[data-testid="stBaseButton-primary"]{
-  background:var(--green)!important;color:#fff!important;border:1px solid var(--green)!important;border-radius:8px!important;
-  font-weight:600;padding:.65rem 1.6rem;box-shadow:none;}
-button[kind="primary"]:hover,button[data-testid="stBaseButton-primary"]:hover{background:var(--green-dark)!important;}
+  background:var(--wheat)!important;color:var(--on-wheat)!important;border:1px solid var(--wheat-dark)!important;
+  border-radius:8px!important;font-weight:700;padding:.65rem 1.6rem;box-shadow:none;}
+button[kind="primary"] p,button[data-testid="stBaseButton-primary"] p{color:var(--on-wheat)!important;font-weight:700;}
+button[kind="primary"]:hover,button[data-testid="stBaseButton-primary"]:hover{background:var(--wheat-dark)!important;}
 /* secondary buttons: plain outline */
 div[data-testid="stButton"] button:not([kind="primary"]),div[data-testid="stDownloadButton"] button{
   background:var(--surface);color:var(--ink);border:1px solid var(--line-strong);border-radius:8px;font-weight:600;box-shadow:none;}
@@ -179,7 +186,7 @@ div[data-testid="stSegmentedControl"] button{border-radius:8px;border:1px solid 
 div[data-testid="stPills"] button:hover,div[data-testid="stButtonGroup"] button:hover,
 div[data-testid="stSegmentedControl"] button:hover{border-color:var(--green);}
 button[data-testid="stBaseButton-pillsActive"],button[data-testid="stBaseButton-segmented_controlActive"]{
-  background:var(--green-soft)!important;border-color:var(--green)!important;color:#1E4B28!important;font-weight:700;}
+  background:var(--green-soft)!important;border-color:var(--green)!important;color:var(--green)!important;font-weight:700;}
 div[data-baseweb="input"],div[data-baseweb="select"]>div,div[data-baseweb="base-input"],textarea{
   background:var(--surface)!important;border-radius:8px!important;border-color:var(--line-strong)!important;}
 label[data-testid="stWidgetLabel"] p{color:var(--ink);font-size:.95rem;font-weight:600;}
@@ -193,7 +200,7 @@ div[data-testid="stExpander"] summary p{font-weight:600;color:var(--ink);}
 div[data-testid="stDataFrame"]{border-radius:8px;overflow:hidden;border:1px solid var(--line);}
 div[data-testid="stAlert"]{border-radius:8px;}
 div[data-testid="stCaptionContainer"]{color:var(--muted);}
-button:focus-visible{outline:3px solid #8DB38F!important;outline-offset:2px;}
+button:focus-visible{outline:3px solid var(--wheat)!important;outline-offset:2px;}
 
 @media (max-width:720px){
   .stApp{font-size:16px;}

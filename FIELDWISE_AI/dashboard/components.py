@@ -100,7 +100,7 @@ def reco_card(
 def alt_card(label: str, title: str, meta: str, caution: Optional[str] = None) -> str:
     extra = f'<div class="m" style="margin-top:.4rem">{_e(caution)}</div>' if caution else ""
     return (
-        f'<div class="alt"><div class="eyebrow" style="color:#66604F">{_e(label)}</div>'
+        f'<div class="alt"><div class="eyebrow" style="color:#5F5A48">{_e(label)}</div>'
         f'<div class="t">{_e(title)}</div><div class="m">{_e(meta)}</div>{extra}</div>'
     )
 

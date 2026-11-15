@@ -79,7 +79,7 @@ def build_map(
         folium.CircleMarker(
             location=(d["latitude"], d["longitude"]),
             radius=11 if is_selected else 7,
-            color="#A4673A" if is_selected else "#2F6B3A",
+            color="#A4673A" if is_selected else "#1F4D2B",
             weight=3 if is_selected else 2,
             fill=True,
             fill_opacity=0.55,
@@ -89,11 +89,11 @@ def build_map(
 
     if grid_link is not None:
         folium.CircleMarker(
-            location=grid_link, radius=9, color="#C98B2B", weight=2, fill=False,
+            location=grid_link, radius=9, color="#D4910F", weight=3, fill=False,
             tooltip="NASA weather area used for this field",
         ).add_to(fmap)
         if farm_point is not None:
-            folium.PolyLine([farm_point, grid_link], color="#C98B2B", weight=2, dash_array="6", opacity=0.9).add_to(fmap)
+            folium.PolyLine([farm_point, grid_link], color="#D4910F", weight=2, dash_array="6", opacity=0.9).add_to(fmap)
 
     if farm_point is not None:
         folium.Marker(
@@ -106,7 +106,7 @@ def build_map(
             if d:
                 folium.PolyLine(
                     [farm_point, (d["latitude"], d["longitude"])],
-                    color="#C98B2B", weight=2, dash_array="6", opacity=0.9,
+                    color="#D4910F", weight=2, dash_array="6", opacity=0.9,
                 ).add_to(fmap)
 
     return fmap

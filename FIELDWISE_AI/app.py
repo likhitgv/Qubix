@@ -339,12 +339,12 @@ def _radar(rot: dict) -> go.Figure:
     values = [sum(v) / len(v) for v in totals.values()]
     fig = go.Figure(go.Scatterpolar(
         r=values + values[:1], theta=[n.title() for n in names] + [names[0].title()],
-        fill="toself", line=dict(color=ACCENT, width=2), fillcolor="rgba(47,107,58,.18)",
+        fill="toself", line=dict(color=ACCENT, width=2), fillcolor="rgba(31,77,43,.18)",
     ))
     fig.update_layout(**plot_layout(height=340, showlegend=False), polar=dict(
         bgcolor="rgba(0,0,0,0)",
-        radialaxis=dict(range=[0, 100], gridcolor="#E3DBC9", tickfont=dict(size=9)),
-        angularaxis=dict(gridcolor="#E3DBC9"),
+        radialaxis=dict(range=[0, 100], gridcolor="#E3D9C0", tickfont=dict(size=9)),
+        angularaxis=dict(gridcolor="#E3D9C0"),
     ))
     return fig
 
@@ -570,10 +570,10 @@ def page_sustainability() -> None:
             continue
         items = "".join(f"<li><b>{escape(i['name'])}:</b> {escape(i['detail'])}</li>" for i in sus["indicators"])
         ui.render(
-            f'<div class="panel" style="margin-bottom:.9rem"><div class="eyebrow" style="color:#66604F">Option {rot["rank"]}</div>'
+            f'<div class="panel" style="margin-bottom:.9rem"><div class="eyebrow" style="color:#5F5A48">Option {rot["rank"]}</div>'
             f'<h4 style="font-size:1.25rem;margin:.2rem 0">{escape(rotation_label(rot))}</h4>'
             f'<p>Variety indicator: {sus["indicator_score"]} out of 100</p>'
-            f'<ul style="margin:.5rem 0 0 1.1rem;color:#2B2A26">{items}</ul></div>'
+            f'<ul style="margin:.5rem 0 0 1.1rem;color:#2A2A22">{items}</ul></div>'
         )
     ui.note(INDICATOR_NOTE)
     _footer()
