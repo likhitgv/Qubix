@@ -1,1322 +1,443 @@
+"""Kyro - NASA-data crop rotation decision support for Karnataka farms.
 
-import streamlit as st
-import pandas as pd
-import plotly.express as px
+Run:  py -3.11 -m streamlit run app.py
+UI only: all data handling and scoring lives in modules/.
+"""
+
+from __future__ import annotations
+
 from datetime import date
-from pathlib import Path
 
-from modules.data_analysis import (
-    load_nasa_power_data,
-    generate_district_summaries,
-    generate_district_trends,
-    create_temperature_chart,
-    create_rainfall_chart
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
+from dotenv import load_dotenv
+
+from config.districts import DISTRICTS
+from config.soils import (
+    SOIL_TYPES,
+    WATER_SOURCES,
+    soil_id_from_label,
+    water_availability_from_source,
 )
+from streamlit_folium import st_folium
+
+from dashboard.map_view import build_map
+from dashboard.theme import PLOT_LAYOUT, banner, inject_theme, metric_card, pill
+from modules import advisor
+from modules import kyro_service as svc
 from modules.crop_database import load_crop_database
-from modules.crop_suitability_v2 import rank_crops_v2
-from modules.rotation_engine import generate_crop_rotations
 
-# ============================================================
-# FIELDWISE AI
-# NASA SPACE APPS CHALLENGE 2026
-# Main Streamlit Dashboard - Member 4
-# ============================================================
+load_dotenv()  # reads .env (AI provider keys) if present
 
-# -------------------- PAGE CONFIGURATION --------------------
+st.set_page_config(page_title="Kyro", page_icon="🌱", layout="wide")
+inject_theme()
 
-st.set_page_config(
-    page_title="FIELDWISE AI | Smart Agriculture",
-    page_icon="🌾",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+DISTRICT_NAMES = [d["name"] for d in DISTRICTS]
+PAGES = ["Home", "Farm", "Recommendations", "Climate", "Map", "Sustainability", "Advisor", "About"]
 
-# -------------------- THEME AND CUSTOM CSS --------------------
 
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap');
+# ----------------------------------------------------------------- data
+@st.cache_data(show_spinner=False)
+def _daily() -> pd.DataFrame:
+    df = pd.read_csv(svc.DATA_DIR / "daily_2024-2025.csv", parse_dates=["date"])
+    return df
 
-:root {
-    --background: #F7F1F5;
-    --sidebar: #38283E;
-    --plum: #513B56;
-    --deep-plum: #49334F;
-    --mauve: #876783;
-    --rose: #D6A9B8;
-    --blush: #F3E1E8;
-    --lavender: #EAE1EF;
-    --lavender-border: #D7C8DF;
-    --ivory: #FFF8F0;
-    --text: #403344;
-    --muted: #806F81;
-}
 
-html, body, [class*="css"] {
-    font-family: 'DM Sans', sans-serif;
-}
+@st.cache_data(show_spinner=False)
+def _summary() -> pd.DataFrame:
+    return svc.load_seasonal_summary()
 
-.stApp {
-    background-color: var(--background);
-    color: var(--text);
-}
 
-.block-container {
-    max-width: 1450px;
-    padding-top: 2rem;
-    padding-bottom: 2rem;
-}
+def _state() -> None:
+    st.session_state.setdefault("profile", None)
+    st.session_state.setdefault("plan", None)
+    st.session_state.setdefault("page", "Home")
 
-/* SIDEBAR */
 
-section[data-testid="stSidebar"] {
-    background-color: var(--sidebar);
-}
+def _goto(page: str) -> None:
+    st.session_state["page"] = page
 
-section[data-testid="stSidebar"] * {
-    color: var(--ivory);
-}
 
-section[data-testid="stSidebar"] h1 {
-    font-family: 'Playfair Display', serif;
-    color: #F2DCE6;
-    font-size: 29px;
-}
-
-section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
-    color: #DCC9D9;
-}
-
-/* MAIN HEADINGS */
-
-h1, h2, h3 {
-    font-family: 'Playfair Display', serif !important;
-    color: var(--plum) !important;
-}
-
-h1 {
-    font-size: 37px !important;
-}
-
-h2 {
-    font-size: 28px !important;
-}
-
-h3 {
-    font-size: 21px !important;
-}
-
-p, li, label {
-    color: var(--text);
-}
-
-/* HERO SECTION */
-
-.st-key-hero {
-    background-color: var(--deep-plum);
-    border: 1px solid var(--deep-plum);
-    border-radius: 22px;
-    padding: 30px;
-    margin-bottom: 22px;
-}
-
-.st-key-hero h1 {
-    color: #FFF4EC !important;
-    font-family: 'Playfair Display', serif !important;
-    font-size: 48px !important;
-    font-weight: 700 !important;
-    line-height: 1.2;
-}
-
-.st-key-hero h2,
-.st-key-hero h3 {
-    color: #FFF4EC !important;
-}
-
-.st-key-hero p,
-.st-key-hero span,
-.st-key-hero label,
-.st-key-hero [data-testid="stCaptionContainer"] {
-    color: #F4DFE9 !important;
-}
-
-.st-key-hero [data-testid="stMarkdownContainer"] p {
-    color: #F4DFE9 !important;
-    font-size: 16px;
-    line-height: 1.8;
-}
-
-/* GENERAL CARDS */
-
-div[data-testid="stVerticalBlockBorderWrapper"] {
-    background-color: #EEE6F1;
-    border: 1px solid var(--lavender-border);
-    border-radius: 16px;
-    padding: 12px;
-}
-
-/* FEATURE CARDS */
-
-.st-key-feature-farm,
-.st-key-feature-climate,
-.st-key-feature-crops,
-.st-key-feature-rotation,
-.st-key-feature-sustainability,
-.st-key-feature-nasa {
-    background-color: var(--lavender);
-    border-radius: 16px;
-    padding: 12px;
-}
-
-.st-key-feature-farm h3,
-.st-key-feature-climate h3,
-.st-key-feature-crops h3,
-.st-key-feature-rotation h3,
-.st-key-feature-sustainability h3,
-.st-key-feature-nasa h3 {
-    color: var(--plum) !important;
-}
-
-/* METRIC CARDS */
-
-[data-testid="stMetric"] {
-    background-color: var(--blush);
-    border: 1px solid #E7C9D5;
-    border-radius: 14px;
-    padding: 16px;
-}
-
-[data-testid="stMetricLabel"] {
-    color: #73576F !important;
-}
-
-[data-testid="stMetricValue"] {
-    color: #634665 !important;
-    font-weight: 700;
-}
-
-/* BUTTONS */
-
-.stButton > button {
-    background-color: var(--mauve);
-    color: white;
-    border: 1px solid var(--mauve);
-    border-radius: 9px;
-    font-weight: 600;
-    padding: 8px 18px;
-}
-
-.stButton > button:hover {
-    background-color: var(--deep-plum);
-    color: white;
-    border-color: var(--deep-plum);
-}
-
-/* INPUTS */
-
-.stTextInput input,
-.stNumberInput input,
-.stDateInput input,
-.stTextArea textarea {
-    background-color: #FFFAFC;
-    color: var(--text);
-    border-radius: 8px;
-}
-
-[data-baseweb="select"] {
-    background-color: #FFFAFC;
-    border-radius: 8px;
-}
-
-/* TABS */
-
-.stTabs [data-baseweb="tab"] {
-    color: var(--plum);
-    font-weight: 600;
-}
-
-.stTabs [aria-selected="true"] {
-    color: var(--mauve) !important;
-}
-
-/* ALERTS AND DIVIDERS */
-
-hr {
-    border-color: #DDCEDF;
-}
-
-[data-testid="stAlert"] {
-    border-radius: 12px;
-}
-
-/* FOOTER */
-
-.footer-text {
-    text-align: center;
-    color: var(--muted);
-    font-size: 13px;
-    padding: 20px 0 5px 0;
-}
-
-</style>
-""", unsafe_allow_html=True)
-
-
-# ============================================================
-# CONSTANTS
-# ============================================================
-
-DISTRICTS = {
-    "Ballari": {
-        "latitude": 15.1394,
-        "longitude": 76.9214
-    },
-    "Shivamogga": {
-        "latitude": 13.9299,
-        "longitude": 75.5681
-    },
-    "Vijayapura": {
-        "latitude": 16.8302,
-        "longitude": 75.7100
-    },
-    "Belagavi": {
-        "latitude": 15.8497,
-        "longitude": 74.4977
-    },
-    "Dharwad": {
-        "latitude": 15.4589,
-        "longitude": 75.0078
-    }
-}
-
-# ============================================================
-# REUSABLE UI FUNCTIONS
-# ============================================================
-
-def section_title(title, description=None):
-    st.subheader(title)
-
-    if description:
-        st.caption(description)
-
-
-def feature_card(title, description, key):
-    with st.container(border=True, key=key):
-        st.markdown(f"### {title}")
-        st.write(description)
-
-
-def information_card(title, description, key):
-    with st.container(border=True, key=key):
-        st.markdown(f"### {title}")
-        st.write(description)
-
-
-def show_pending_message(module_name):
-    st.info(
-        f"{module_name} integration is pending. "
-        "Results will appear here after the relevant team module "
-        "is connected."
-    )
-
-
-def show_data_source(source):
-    st.caption(f"Data source: {source}")
-
-
-# ============================================================
-# SESSION STATE
-# ============================================================
-
-if "farm_profile" not in st.session_state:
-    st.session_state.farm_profile = None
-
-if "climate_data" not in st.session_state:
-    st.session_state.climate_data = None
-
-if "crop_results" not in st.session_state:
-    st.session_state.crop_results = None
-
-if "rotation_results" not in st.session_state:
-    st.session_state.rotation_results = None
-
-if "sustainability_results" not in st.session_state:
-    st.session_state.sustainability_results = None
-# ============================================================
-# MEMBER 2 - CLIMATE DATA INTEGRATION
-# ============================================================
-
-BASE_DIR = Path(__file__).resolve().parent
-
-SUMMARY_PATH = (
-    BASE_DIR / "outputs" / "member3_handoff"
-    / "district_climate_summary.csv"
-)
-
-TRENDS_PATH = (
-    BASE_DIR / "outputs" / "member3_handoff"
-    / "daily_climate_trends.csv"
-)
-
-
-@st.cache_data
-def load_member2_climate_outputs():
-    nasa_data_path = BASE_DIR / "data" / "nasa_power" / "nasa_power_consolidated.csv"
-
-    climate_data, report = load_nasa_power_data(nasa_data_path)
-
-    summary_data = pd.DataFrame(
-        generate_district_summaries(climate_data)
-    )
-
-    trends_data = generate_district_trends(climate_data)
-
-    return summary_data, trends_data
-
-@st.cache_data
-def load_seasonal_summary():
-    """Load NASA POWER seasonal data for crop intelligence."""
-
-    seasonal_path = (
-        BASE_DIR / "data" / "nasa_power" / "seasonal_summary.csv"
-    )
-
-    if not seasonal_path.exists():
-        raise FileNotFoundError(
-            f"Seasonal NASA data not found: {seasonal_path}"
-        )
-
-    data = pd.read_csv(seasonal_path)
-
-    required_columns = [
-        "location",
-        "season",
-        "season_year",
-        "complete",
-        "temperature_c",
-        "rainfall_mm",
-    ]
-
-    missing_columns = [
-        column for column in required_columns
-        if column not in data.columns
-    ]
-
-    if missing_columns:
-        raise ValueError(
-            f"Seasonal data is missing columns: {missing_columns}"
-        )
-
-    data["complete"] = (
-        data["complete"]
-        .astype(str)
-        .str.strip()
-        .str.lower()
-        .isin(["true", "1", "yes"])
-    )
-
-    data["season_year"] = pd.to_numeric(
-        data["season_year"], errors="coerce"
-    )
-
-    data["temperature_c"] = pd.to_numeric(
-        data["temperature_c"], errors="coerce"
-    )
-
-    data["rainfall_mm"] = pd.to_numeric(
-        data["rainfall_mm"], errors="coerce"
-    )
-
-    return data
-
-
-def get_latest_complete_seasons(district):
-    """Return the latest complete NASA record for each season."""
-
-    data = load_seasonal_summary()
-
-    district_data = data[
-        (data["location"].str.strip() == district)
-        & data["complete"]
-    ].copy()
-
-    district_data = district_data.dropna(
-        subset=["season_year", "temperature_c", "rainfall_mm"]
-    )
-
-    district_data = district_data.sort_values(
-        "season_year", ascending=False
-    )
-
-    latest = district_data.drop_duplicates(
-        subset=["season"], keep="first"
-    )
-
-    return latest
-
-def prepare_engine_farm_profile(profile, season=None):
-    """Convert dashboard farm values into crop-engine values."""
-
-    soil_mapping = {
-        "Red Soil": "red-soil",
-        "Black Soil": "black-soil",
-        "Sandy Soil": "sandy",
-        "Alluvial Soil": "alluvial",
-    }
-
-    soil_type = soil_mapping.get(profile.get("soil_type"))
-
-    # Current crop database contains rainfed requirements only.
-    water_availability = (
-        "rainfed"
-        if profile.get("irrigation") == "Rainfed"
-        else None
-    )
-
-    return {
-        "soil_type": soil_type,
-        "water_availability": water_availability,
-        "season": season.lower() if season else None,
-    }
-
-
-def build_seasonal_conditions(district):
-    """Prepare complete NASA seasonal records for rotation planning."""
-
-    seasonal_data = get_latest_complete_seasons(district)
-
-    conditions = []
-
-    for _, row in seasonal_data.iterrows():
-        conditions.append({
-            "season": str(row["season"]).lower(),
-            "environmental_data": {
-                "temperature_c": float(row["temperature_c"]),
-                "rainfall_mm": float(row["rainfall_mm"]),
-            },
-        })
-
-    return conditions
-
-def calculate_crop_recommendations(profile, season):
-    """Calculate crop suitability using NASA seasonal data."""
-
-    seasonal_data = get_latest_complete_seasons(
-        profile["district"]
-    )
-
-    selected = seasonal_data[
-        seasonal_data["season"].str.lower() == season.lower()
-    ]
-
-    if selected.empty:
-        raise ValueError(
-            f"No complete NASA data available for {season}."
-        )
-
-    row = selected.iloc[0]
-
-    environmental_data = {
-        "temperature_c": float(row["temperature_c"]),
-        "rainfall_mm": float(row["rainfall_mm"]),
-    }
-
-    engine_profile = prepare_engine_farm_profile(
-        profile, season
-    )
-
-    crops = load_crop_database()
-
-    results = rank_crops_v2(
-        crops=crops,
-        environmental_data=environmental_data,
-        farm_profile=engine_profile,
-        minimum_data_coverage=60,
-    )
-
-    return results, int(row["season_year"])
-
-
-def calculate_rotation_recommendations(profile):
-    """Generate multi-season crop rotation strategies."""
-
-    seasonal_conditions = build_seasonal_conditions(
-        profile["district"]
-    )
-
-    if len(seasonal_conditions) < 2:
-        raise ValueError(
-            "At least two complete seasons are required."
-        )
-
-    engine_profile = prepare_engine_farm_profile(profile)
-
-    crops = load_crop_database()
-
-    return generate_crop_rotations(
-        crops=crops,
-        seasonal_conditions=seasonal_conditions,
-        farm_profile=engine_profile,
-        top_n=5,
-        minimum_data_coverage=60,
-    )
-
-
-# ============================================================
-# SIDEBAR NAVIGATION
-# ============================================================
-
-with st.sidebar:
-
-    st.title("FIELDWISE AI")
-
-    st.caption("NASA Space Apps Challenge 2026")
-
-    st.divider()
-
-    st.markdown("### NAVIGATION")
-
-    page = st.radio(
-        "Choose a dashboard",
-        [
-            "Overview",
-            "Farm Profile",
-            "Climate Analysis",
-            "Crop Recommendations",
-            "Crop Rotation",
-            "Sustainability"
-        ],
-        label_visibility="collapsed"
-    )
-
-    st.divider()
-
-    st.markdown("### PROJECT")
-
-    st.caption("Field Shift: Adapting Farms with NASA Data")
-
-    st.caption("Initial coverage: Karnataka")
-
-    st.divider()
-
-    st.caption("Developed by Team FIELDWISE AI")
-
-
-# ============================================================
-# PAGE 1: OVERVIEW
-# ============================================================
-
-if page == "Overview":
-
-    # HERO SECTION
-
-    with st.container(border=True, key="hero"):
-
-        st.caption("NASA SPACE APPS CHALLENGE 2026")
-
-        st.title("Agriculture, Reimagined.")
-
-        st.write(
-            "Transform environmental intelligence into smarter "
-            "crop decisions and sustainable farming strategies."
-        )
-
+# ----------------------------------------------------------------- sidebar
+def sidebar() -> str:
+    with st.sidebar:
+        st.markdown('<p class="kyro-brand">Kyro</p>', unsafe_allow_html=True)
+        st.markdown('<div class="kyro-tag">Adapt your farm with NASA data</div>', unsafe_allow_html=True)
         st.write("")
-
-        st.markdown("**PLATFORM STATUS**")
-
-        st.markdown("**● Initializing**")
-
-        st.caption("Awaiting team integration")
-
-    # OVERVIEW METRICS
-
-    section_title(
-        "Platform Overview",
-        "Your workspace for climate-aware agricultural planning."
-    )
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.metric(
-            label="Target Districts",
-            value="05"
-        )
-        st.caption("Initial Karnataka coverage")
-
-    with col2:
-        st.metric(
-            label="Dashboard Modules",
-            value="06"
-        )
-        st.caption("Agricultural decision-support areas")
-
-    with col3:
-        st.metric(
-            label="Primary Data Source",
-            value="NASA POWER"
-        )
-        st.caption("Climate data integration")
-
-    st.write("")
-
-    # WORKSPACE CARDS
-
-    section_title(
-        "Explore Your Workspace",
-        "Choose a module to explore the platform."
-    )
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        feature_card(
-            "Farm Profile",
-            "Enter your district, farm size, soil type "
-            "and irrigation details.",
-            "feature-farm"
-        )
-
-    with col2:
-        feature_card(
-            "Climate Analysis",
-            "Explore climate indicators retrieved from "
-            "NASA POWER data.",
-            "feature-climate"
-        )
-
-    with col3:
-        feature_card(
-            "Crop Recommendations",
-            "Explore crop suitability based on available "
-            "climate and soil information.",
-            "feature-crops"
-        )
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        feature_card(
-            "Crop Rotation",
-            "Understand crop sequences and rotation "
-            "strategies for agricultural planning.",
-            "feature-rotation"
-        )
-
-    with col2:
-        feature_card(
-            "Sustainability",
-            "Explore sustainability indicators and "
-            "resource-related insights.",
-            "feature-sustainability"
-        )
-
-    with col3:
-        feature_card(
-            "NASA Data Integration",
-            "Use environmental intelligence to support "
-            "agricultural decisions.",
-            "feature-nasa"
-        )
-
-    st.write("")
-
-    # DISTRICT COVERAGE
-
-    section_title(
-        "Initial District Coverage",
-        "The first version of FIELDWISE AI focuses on five Karnataka districts."
-    )
-
-    district_cols = st.columns(5)
-
-    for index, district in enumerate(DISTRICTS.keys()):
-        with district_cols[index]:
-            with st.container(border=True):
-                st.markdown(f"**{district}**")
-                st.caption("Karnataka")
-
-    # ABOUT THE PLATFORM
-
-    st.write("")
-
-    section_title("About FIELDWISE AI")
-
-    with st.container(border=True):
-
-        st.write(
-            "FIELDWISE AI is a climate-aware agricultural "
-            "decision-support platform. It aims to combine "
-            "NASA environmental data, soil information and "
-            "crop requirements to support informed farming decisions."
-        )
-
-        st.write(
-            "**Technology:** Python | Streamlit | NASA POWER API | "
-            "Pandas | NumPy | Plotly"
-        )
-
-        st.write(
-            "**Workflow:** Farm Profile → Climate Analysis → "
-            "Crop Suitability → Crop Rotation → Sustainability"
-        )
-
-        st.caption(
-            "Recommendations will depend on the availability "
-            "and quality of the connected data."
-        )
-
-
-# ============================================================
-# PAGE 2: FARM PROFILE
-# ============================================================
-
-elif page == "Farm Profile":
-
-    section_title(
-        "Farm Profile",
-        "Provide your farm details to begin the assessment."
-    )
-
-    st.write("")
-
-    with st.container(border=True):
-
-        st.markdown("### Location Details")
-
-        with st.form("farm_profile_form"):
-
-            district = st.selectbox(
-                "Select District",
-                list(DISTRICTS.keys())
-            )
-
-            farm_size = st.number_input(
-                "Farm Size (acres)",
-                min_value=0.1,
-                max_value=10000.0,
-                value=1.0,
-                step=0.5
-            )
-
-            st.markdown("### Soil and Irrigation")
-
-            soil_type = st.selectbox(
-                "Soil Type",
-                [
-                    "Red Soil",
-                    "Black Soil",
-                    "Laterite Soil",
-                    "Sandy Soil",
-                    "Alluvial Soil",
-                    "Other",
-                    "Not Sure"
-                ]
-            )
-
-            irrigation = st.selectbox(
-                "Irrigation Availability",
-                [
-                    "Rainfed",
-                    "Canal",
-                    "Borewell",
-                    "Drip Irrigation",
-                    "Other"
-                ]
-            )
-
-            farming_season = st.selectbox(
-                "Farming Season",
-                [
-                    "Kharif",
-                    "Rabi",
-                    "Summer",
-                    "Multiple Seasons",
-                    "Not Sure"
-                ]
-            )
-
-            crop_history = st.text_area(
-                "Previously Grown Crops (Optional)",
-                placeholder="Example: Paddy, Maize, Groundnut"
-            )
-
-            submitted = st.form_submit_button(
-                "Save Farm Profile"
-            )
-
-            if submitted:
-
-                st.session_state.farm_profile = {
-                    "district": district,
-                    "coordinates": DISTRICTS[district],
-                    "farm_size_acres": farm_size,
-                    "soil_type": soil_type,
-                    "irrigation": irrigation,
-                    "farming_season": farming_season,
-                    "previous_crops": crop_history
-                }
-
-                st.success("Farm profile saved successfully.")
-
-    if st.session_state.farm_profile:
-
+        page = st.radio("Navigate", PAGES, key="page", label_visibility="collapsed")
         st.write("")
-
-        section_title("Saved Farm Information")
-
-        st.json(st.session_state.farm_profile)
-
-        st.caption(
-            "This profile is currently stored in the Streamlit session. "
-            "Permanent database storage requires backend integration."
-        )
-
-
-# ============================================================
-# PAGE 3: CLIMATE ANALYSIS
-# ============================================================
+        profile = st.session_state.profile
+        if profile:
+            st.markdown(
+                f'<div class="glass"><div class="metric-label">Current farm</div>'
+                f'<b>{profile["district"]}</b><br>'
+                f'<span class="metric-sub">{profile["soil_label"]} · {profile["water_label"]}</span></div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.caption("No farm saved yet.")
+    return page
 
 
-# ============================================================
-# PAGE 3: CLIMATE ANALYSIS
-# ============================================================
-
-elif page == "Climate Analysis":
-
-    section_title(
-        "Climate Analysis",
-        "Explore environmental indicators for your selected district."
+# ----------------------------------------------------------------- pages
+def page_home() -> None:
+    st.markdown(
+        '<div class="hero"><h1>Choose the next crop with evidence, not guesswork.</h1>'
+        "<p>Kyro reads NASA POWER climate data for your district and ranks multi-season crop "
+        "rotations against a sourced crop database, with every score explained.</p></div>",
+        unsafe_allow_html=True,
     )
+    cols = st.columns(3)
+    cards = [
+        ("5", "Karnataka districts", "Ballari, Shivamogga, Vijayapura, Belagavi, Dharwad"),
+        ("2024–25", "NASA POWER daily data", "Temperature, rainfall, humidity, solar"),
+        (str(len(load_crop_database())), "Crops in database", "Sourced, with unverified rows flagged"),
+    ]
+    for col, (v, l, s) in zip(cols, cards):
+        col.markdown(metric_card(l, v, s), unsafe_allow_html=True)
+    st.write("")
+    st.button("Start with your farm →", on_click=_goto, args=("Farm",))
+    banner(svc.DISCLAIMER, info=True)
 
-    profile = st.session_state.farm_profile
 
-    try:
-        summary_data, trends_data = load_member2_climate_outputs()
+def page_farm() -> None:
+    st.header("Your farm")
+    st.caption("Tell Kyro where your farm is and what it has.")
 
-        available_districts = sorted(
-            summary_data["location"].dropna().unique()
+    mode = st.radio("Location", ["Pick a district", "Use coordinates"], horizontal=True)
+    district = None
+    lat = lon = None
+    geo = None
+    if mode == "Pick a district":
+        district = st.selectbox("District", DISTRICT_NAMES)
+    else:
+        # A map click from the previous run is applied before the inputs exist.
+        click = st.session_state.pop("_map_click", None)
+        if click:
+            st.session_state["farm_lat"], st.session_state["farm_lon"] = click
+        st.session_state.setdefault("farm_lat", 15.4589)
+        st.session_state.setdefault("farm_lon", 75.0078)
+        c1, c2 = st.columns(2)
+        lat = c1.number_input("Latitude", -90.0, 90.0, format="%.4f", key="farm_lat")
+        lon = c2.number_input("Longitude", -180.0, 180.0, format="%.4f", key="farm_lon")
+        geo = svc.nearest_district(lat, lon)
+        st.caption("Click the map to place your farm, or type coordinates above.")
+        clicked = st_folium(
+            build_map(geo["district"] if geo["within_coverage"] else None, (lat, lon), _summary()),
+            height=360, use_container_width=True, returned_objects=["last_clicked"],
+            key="farm_map",
         )
-
-        if profile and profile["district"] in available_districts:
-
-            selected_district = profile["district"]
-
-            st.write(f"**Selected District:** {selected_district}")
-
-            st.write(
-                f"**Coordinates:** "
-                f"{profile['coordinates']['latitude']}, "
-                f"{profile['coordinates']['longitude']}"
+        last = (clicked or {}).get("last_clicked")
+        if last and (round(last["lat"], 4), round(last["lng"], 4)) != (round(lat, 4), round(lon, 4)):
+            st.session_state["_map_click"] = (round(last["lat"], 4), round(last["lng"], 4))
+            st.rerun()
+        if geo["within_coverage"]:
+            banner(
+                f"Nearest supported district: <b>{geo['district']}</b> "
+                f"({geo['distance_km']} km away). {geo['note']}",
+                info=True,
+            )
+            district = geo["district"]
+        else:
+            banner(
+                f"This point is {geo['distance_km']} km from the nearest supported district "
+                f"({geo['district']}). Kyro only has data for five Karnataka districts.",
             )
 
-        else:
+    with st.form("farm_form"):
+        c1, c2 = st.columns(2)
+        soil_label = c1.selectbox("Soil type", ["Not sure"] + [l for _, l in SOIL_TYPES])
+        water_label = c2.selectbox("Water source", WATER_SOURCES)
+        c3, c4 = st.columns(2)
+        area = c3.number_input("Farm size (hectares)", 0.1, 10000.0, 1.0, 0.1)
+        previous = c4.text_input("Previous crops (optional)", placeholder="e.g. sorghum, groundnut")
+        submitted = st.form_submit_button("Generate recommendations")
 
-            selected_district = st.selectbox(
-                "Select District",
-                available_districts
+    if submitted:
+        if district is None:
+            st.error("Choose a district, or enter coordinates inside the supported area.")
+            return
+        profile = {
+            "district": district,
+            "soil_type": soil_id_from_label(soil_label),
+            "soil_label": soil_label,
+            "water_availability": water_availability_from_source(water_label),
+            "water_label": water_label,
+            "area_ha": area,
+            "previous_crops": previous.strip() or None,
+            "latitude": lat,
+            "longitude": lon,
+        }
+        try:
+            plan = svc.build_plan(profile, _summary())
+        except (ValueError, FileNotFoundError) as error:
+            st.error(f"Could not build a plan: {error}")
+            return
+        st.session_state.profile = profile
+        st.session_state.plan = plan
+        st.success("Saved. Opening your recommendations…")
+        st.session_state["_nav"] = "Recommendations"
+        st.rerun()
+
+
+def _need_plan() -> dict | None:
+    plan = st.session_state.plan
+    if not plan:
+        st.info("Save your farm first to see this page.")
+        st.button("Go to Farm", on_click=_goto, args=("Farm",))
+    return plan
+
+
+def page_recommendations() -> None:
+    st.header("Recommended rotations")
+    plan = _need_plan()
+    if not plan:
+        return
+    for note in plan["warnings"]:
+        banner(note)
+    cond = {c["season"]: c["environmental_data"] for c in plan["conditions"]}
+    cols = st.columns(len(cond))
+    for col, (season, env) in zip(cols, cond.items()):
+        col.markdown(
+            metric_card(
+                f"{season.title()} climate",
+                f"{env['temperature_c']:.1f} °C",
+                f"{env['rainfall_mm']:.0f} mm rain · NASA POWER seasonal average",
+            ),
+            unsafe_allow_html=True,
+        )
+    st.write("")
+    if not plan["rotations"]:
+        st.warning("No rotation met the minimum requirements for this farm.")
+        return
+
+    for rot, sus in zip(plan["rotations"], plan["sustainability"]):
+        with st.container():
+            h1, h2 = st.columns([1, 12])
+            h1.markdown(f'<div class="rank-badge">{rot["rank"]}</div>', unsafe_allow_html=True)
+            h2.markdown(f"**Rotation score {rot['overall_rotation_score']:.1f} / 100**")
+            chips = "".join(
+                f'<span class="crop-chip"><small>{c["season"]}</small>{c["crop_name"]} '
+                f'<span style="color:#6ee7b7">{c["suitability_score"]:.0f}</span></span>'
+                for c in rot["crop_sequence"]
             )
-
-            if profile:
-                st.warning(
-                    "Saved farm district was not found in the "
-                    "climate dataset. Select an available district."
+            st.markdown(chips, unsafe_allow_html=True)
+            flagged = [c for c in rot["crop_sequence"] if c.get("source_warnings")]
+            if flagged:
+                st.markdown(
+                    pill("Data needs verification", "amber")
+                    + " ".join(c["crop_name"] for c in flagged),
+                    unsafe_allow_html=True,
                 )
-            else:
-                st.info(
-                    "Save a farm profile to automatically use its "
-                    "district across the dashboard."
+            if sus.get("available"):
+                st.markdown(
+                    pill(f"Sustainability indicator {sus['indicator_score']}", "blue")
+                    + (pill("Includes legume", "green") if sus["legume_count"] else pill("No legume", "red")),
+                    unsafe_allow_html=True,
                 )
-
-        # Get selected district summary
-
-        district_summary = summary_data[
-            summary_data["location"] == selected_district
-        ]
-
-        if district_summary.empty:
-            st.warning("No climate summary found for this district.")
-
-        else:
-
-            district_summary = district_summary.iloc[0]
-
+            with st.expander("Why this score?"):
+                for e in rot.get("explanations", []):
+                    st.write("•", e)
+                for c in rot["crop_sequence"]:
+                    details = c.get("suitability_details", {})
+                    st.markdown(f"**{c['crop_name']}** ({c['season']})")
+                    comps = details.get("component_scores", {})
+                    if comps:
+                        st.dataframe(
+                            pd.DataFrame({"component": list(comps), "score": list(comps.values())}),
+                            hide_index=True, width="stretch",
+                        )
+                    for w in c.get("source_warnings", []):
+                        st.caption(f"⚠ {w}")
+                    if c.get("source_urls"):
+                        st.caption(f"Sources: {c['source_urls']}")
+                for lim in rot.get("limitations", []):
+                    st.caption(f"Limitation: {lim}")
             st.write("")
-            section_title("Climate Indicators")
 
-            # First row
-
-            col1, col2, col3 = st.columns(3)
-
-            with col1:
-                with st.container(border=True):
-                    st.metric(
-                        "Average Temperature",
-                        f"{district_summary['average_temperature_c']:.2f} °C"
-                    )
-
-            with col2:
-                with st.container(border=True):
-                    st.metric(
-                        "Minimum Temperature",
-                        f"{district_summary['minimum_temperature_c']:.2f} °C"
-                    )
-
-            with col3:
-                with st.container(border=True):
-                    st.metric(
-                        "Maximum Temperature",
-                        f"{district_summary['maximum_temperature_c']:.2f} °C"
-                    )
-
-            # Second row
-
-            col1, col2, col3 = st.columns(3)
-
-            with col1:
-                with st.container(border=True):
-                    st.metric(
-                        "Total Rainfall",
-                        f"{district_summary['total_rainfall_mm']:.2f} mm"
-                    )
-
-            with col2:
-                with st.container(border=True):
-                    st.metric(
-                        "Average Humidity",
-                        f"{district_summary['average_humidity_percent']:.2f}%"
-                    )
-
-            with col3:
-                with st.container(border=True):
-                    st.metric(
-                        "Solar Radiation",
-                        f"{district_summary['average_solar_radiation']:.2f} "
-                        "MJ/m²/day"
-                    )
-
-            # Filter daily records
-
-            district_trends = trends_data[
-                trends_data["location"] == selected_district
-            ].copy()
-
-            st.write("")
-            section_title("Climate Data Visualization")
-
-            # Temperature chart
-
-            st.markdown("### Temperature Trends")
-
-            temperature_fig = create_temperature_chart(
-                district_trends
-            )
-
-            temperature_fig.update_layout(
-                template="plotly_white",
-                title_font_color="#513B56",
-                font_color="#403344",
-                paper_bgcolor="#FFF8F0",
-                plot_bgcolor="#FFF8F0",
-                yaxis_title="Temperature (°C)"
-            )
-
-            st.plotly_chart(
-                temperature_fig,
-                use_container_width=True
-            )
-
-            # Rainfall chart
-
-            st.markdown("### Rainfall Trends")
-
-            rainfall_fig = create_rainfall_chart(
-                district_trends
-            )
-
-            rainfall_fig.update_layout(
-                template="plotly_white",
-                title_font_color="#513B56",
-                font_color="#403344",
-                paper_bgcolor="#FFF8F0",
-                plot_bgcolor="#FFF8F0",
-                yaxis_title="Rainfall (mm/day)"
-            )
-
-            st.plotly_chart(
-                rainfall_fig,
-                use_container_width=True
-            )
-
-            # Daily data table
-
-            with st.expander("View Daily Climate Records"):
-
-                st.dataframe(
-                    district_trends,
-                    use_container_width=True
-                )
-
-            show_data_source(
-                "NASA POWER | January 1–31, 2025 | "
-                "Processed by Member 2"
-            )
-
-    except Exception as error:
-
-        st.error(
-            f"Unable to load climate data: {error}"
-        )
-
-        st.info(
-            "Check whether Member 2's climate CSV files are "
-            "available in outputs/member3_handoff."
-        )
-
-
-# ============================================================
-# PAGE 4: CROP RECOMMENDATIONS
-# ============================================================
-
-elif page == "Crop Recommendations":
-
-    section_title(
-        "Crop Recommendations",
-        "Explore crops based on farm conditions and environmental data."
+    st.download_button(
+        "Download recommendations (CSV)",
+        _plan_csv(plan).to_csv(index=False).encode("utf-8"),
+        file_name=f"kyro_{plan['district'].lower()}_{date.today().isoformat()}.csv",
+        mime="text/csv",
     )
+    banner(plan["disclaimer"], info=True)
 
-    profile = st.session_state.farm_profile
 
-    if profile:
+def _plan_csv(plan: dict) -> pd.DataFrame:
+    rows = []
+    for rot in plan["rotations"]:
+        for c in rot["crop_sequence"]:
+            rows.append({
+                "district": plan["district"], "rotation_rank": rot["rank"],
+                "rotation_score": rot["overall_rotation_score"], "season": c["season"],
+                "crop": c["crop_name"], "crop_score": c["suitability_score"],
+                "source_verification": c.get("source_verification"),
+            })
+    return pd.DataFrame(rows)
 
-        st.write(f"**District:** {profile['district']}")
-        st.write(f"**Soil Type:** {profile['soil_type']}")
-        st.write(f"**Farm Size:** {profile['farm_size_acres']} acres")
 
-    else:
+def page_climate() -> None:
+    st.header("Climate (NASA POWER)")
+    banner(svc.DATA_NATURE, info=True)
+    plan = st.session_state.plan
+    default = plan["district"] if plan else DISTRICT_NAMES[0]
+    district = st.selectbox("District", DISTRICT_NAMES, index=DISTRICT_NAMES.index(default))
+    df = _daily()
+    df = df[df["location"] == district].sort_values("date")
+    if df.empty:
+        st.warning("No stored data for this district.")
+        return
+    monthly = df.set_index("date").resample("MS").agg({"temperature_c": "mean", "rainfall_mm": "sum"}).reset_index()
 
-        st.warning(
-            "Please complete your Farm Profile before exploring "
-            "personalized crop recommendations."
-        )
-
+    c1, c2, c3 = st.columns(3)
+    c1.markdown(metric_card("Mean temperature", f"{df['temperature_c'].mean():.1f} °C", "daily mean, 2024–2025"), unsafe_allow_html=True)
+    c2.markdown(metric_card("Total rainfall", f"{df['rainfall_mm'].sum():.0f} mm", "sum of daily values"), unsafe_allow_html=True)
+    c3.markdown(metric_card("Days of data", f"{len(df)}", f"{df['date'].min():%d %b %Y} – {df['date'].max():%d %b %Y}"), unsafe_allow_html=True)
     st.write("")
 
-    section_title("Suitability Assessment")
+    fig = go.Figure()
+    fig.add_bar(x=monthly["date"], y=monthly["rainfall_mm"], name="Rainfall (mm)", marker_color="#22d3ee", opacity=.7)
+    fig.add_scatter(x=monthly["date"], y=monthly["temperature_c"], name="Temperature (°C)", yaxis="y2",
+                    line=dict(color="#34d399", width=3))
+    fig.update_layout(**PLOT_LAYOUT, height=420,
+                      yaxis=dict(title="Rainfall (mm / month)"),
+                      yaxis2=dict(title="Temperature (°C)", overlaying="y", side="right"))
+    st.plotly_chart(fig, width="stretch")
 
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        with st.container(border=True):
-            st.markdown("### Soil Compatibility")
-            st.caption("Based on soil characteristics")
-
-    with col2:
-        with st.container(border=True):
-            st.markdown("### Climate Compatibility")
-            st.caption("Based on climate requirements")
-
-    with col3:
-        with st.container(border=True):
-            st.markdown("### Crop Suitability")
-            st.caption("Combined suitability assessment")
-
-    st.write("")
-
-    section_title("Recommended Crops")
-
-    crop_results = st.session_state.crop_results
-
-    if crop_results is not None:
-
-        if isinstance(crop_results, pd.DataFrame):
-
-            st.dataframe(
-                crop_results,
-                use_container_width=True
-            )
-
-        else:
-
-            st.write(crop_results)
-
-        st.caption(
-            "Review the recommendation scores, explanations, "
-            "assumptions and limitations provided by the crop engine."
-        )
-
-    else:
-
-        show_pending_message("Crop suitability engine")
-
-        st.write(
-            "The crop recommendation module will provide "
-            "candidate crops, suitability scores, rankings "
-            "and explanations after integration."
-        )
-
-
-# ============================================================
-# PAGE 5: CROP ROTATION
-# ============================================================
-
-elif page == "Crop Rotation":
-
-    section_title(
-        "Crop Rotation Planner",
-        "Explore crop sequences for long-term agricultural planning."
+    seas = _summary()
+    seas = seas[seas["location"] == district].sort_values(["season_year", "season"])
+    st.subheader("Season summaries")
+    st.dataframe(
+        seas[["season", "season_year", "days_available", "complete", "temperature_c", "rainfall_mm"]],
+        hide_index=True, width="stretch",
     )
-
-    profile = st.session_state.farm_profile
-
-    if profile:
-
-        st.write(f"**Selected District:** {profile['district']}")
-
-    else:
-
-        st.warning(
-            "Complete your Farm Profile to provide the rotation "
-            "engine with farm information."
-        )
-
-    st.write("")
-
-    section_title("Rotation Planning Features")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        feature_card(
-            "Crop Sequence",
-            "View suggested crop sequences across farming seasons.",
-            "rotation-sequence"
-        )
-
-    with col2:
-        feature_card(
-            "Soil Considerations",
-            "Understand how crop choices relate to soil health.",
-            "rotation-soil"
-        )
-
-    with col3:
-        feature_card(
-            "Strategy Comparison",
-            "Compare available crop rotation strategies.",
-            "rotation-strategy"
-        )
-
-    st.write("")
-
-    section_title("Rotation Results")
-
-    rotation_results = st.session_state.rotation_results
-
-    if rotation_results is not None:
-
-        if isinstance(rotation_results, pd.DataFrame):
-
-            st.dataframe(
-                rotation_results,
-                use_container_width=True
+    meta = svc.load_provenance(district)
+    with st.expander("Data source and coverage"):
+        if meta:
+            st.markdown(
+                f"- **Source:** {meta.get('source', 'NASA POWER')} daily point API (community AG, UTC)\n"
+                f"- **Period:** {meta.get('start_date', 'not recorded')} to {meta.get('end_date', 'not recorded')}\n"
+                f"- **Retrieved:** {meta.get('retrieved_at', 'not recorded')}\n"
+                f"- **Grid point:** {meta.get('latitude')}, {meta.get('longitude')}"
             )
-
         else:
-
-            st.write(rotation_results)
-
-    else:
-
-        show_pending_message("Crop rotation engine")
-
-        st.caption(
-            "Rotation sequences and their explanations will appear "
-            "after the team's rotation module is connected."
-        )
+            st.write("No provenance record found for this district.")
+        st.caption("Incomplete seasons are not used for recommendations.")
 
 
-# ============================================================
-# PAGE 6: SUSTAINABILITY
-# ============================================================
-
-elif page == "Sustainability":
-
-    section_title(
-        "Sustainability Dashboard",
-        "Explore environmental indicators that support sustainable farming."
+def page_map() -> None:
+    st.header("District map")
+    st.caption("Click a marker for the latest complete NASA POWER seasonal averages.")
+    plan = st.session_state.plan
+    profile = st.session_state.profile
+    point = None
+    if profile and profile.get("latitude") is not None:
+        point = (profile["latitude"], profile["longitude"])
+    st_folium(
+        build_map(plan["district"] if plan else None, point, _summary()),
+        height=520, use_container_width=True, returned_objects=[], key="district_map",
     )
+    banner("Markers are district reference points, not farm boundaries. " + svc.DATA_NATURE, info=True)
 
-    st.write("")
 
-    col1, col2, col3 = st.columns(3)
+def page_sustainability() -> None:
+    st.header("Sustainability indicators")
+    plan = _need_plan()
+    if not plan:
+        return
+    banner("These indicators describe rotation structure only. They are not measured or modelled water, yield or soil results.", info=True)
+    if not plan["rotations"]:
+        st.warning("No rotations to evaluate.")
+        return
+    rows = []
+    for rot, sus in zip(plan["rotations"], plan["sustainability"]):
+        if sus.get("available"):
+            rows.append({"Rotation": f"#{rot['rank']} " + " → ".join(c["crop_name"] for c in rot["crop_sequence"]),
+                         "Suitability": rot["overall_rotation_score"], "Indicator": sus["indicator_score"]})
+    if rows:
+        d = pd.DataFrame(rows)
+        fig = go.Figure()
+        fig.add_bar(y=d["Rotation"], x=d["Suitability"], name="Suitability", orientation="h", marker_color="#34d399")
+        fig.add_bar(y=d["Rotation"], x=d["Indicator"], name="Sustainability indicator", orientation="h", marker_color="#22d3ee")
+        fig.update_layout(**PLOT_LAYOUT, barmode="group", height=120 + 90 * len(d))
+        st.plotly_chart(fig, width="stretch")
+    for rot, sus in zip(plan["rotations"], plan["sustainability"]):
+        if not sus.get("available"):
+            continue
+        with st.expander(f"Rotation #{rot['rank']} details"):
+            tone = {"good": "green", "warning": "amber", "none": "red", "moderate": "blue", "info": "blue"}
+            for ind in sus["indicators"]:
+                st.markdown(pill(ind["name"], tone.get(ind["status"], "blue")) + ind["detail"], unsafe_allow_html=True)
 
-    with col1:
-        feature_card(
-            "Water Use",
-            "Explore water-related indicators when supporting "
-            "data is available.",
-            "sustainability-water"
+
+def page_advisor() -> None:
+    st.header("Kyro Advisor")
+    plan = _need_plan()
+    if not plan:
+        return
+    st.markdown("#### Plain-language summary")
+    st.write(advisor.template_explanation(plan))
+    st.caption("Built only from Kyro's computed results. Works offline.")
+
+    st.markdown("#### Ask Kyro AI")
+    if not advisor.ai_available():
+        banner(
+            "AI explanations are off. Add a free provider key (GROQ_API_KEY, GEMINI_API_KEY or "
+            "OPENROUTER_API_KEY) to .env and restart Kyro. The summary above always works.",
+            info=True,
         )
-
-    with col2:
-        feature_card(
-            "Climate Resilience",
-            "Understand climate-related agricultural risks "
-            "and considerations.",
-            "sustainability-climate"
-        )
-
-    with col3:
-        feature_card(
-            "Soil Health",
-            "Explore soil-related indicators and crop rotation "
-            "considerations.",
-            "sustainability-soil"
-        )
-
-    st.write("")
-
-    section_title("Sustainability Indicators")
-
-    sustainability_results = st.session_state.sustainability_results
-
-    if sustainability_results is not None:
-
-        if isinstance(sustainability_results, pd.DataFrame):
-
-            st.dataframe(
-                sustainability_results,
-                use_container_width=True
-            )
-
+        return
+    language = st.selectbox("Language", ["English", "Kannada", "Hindi"])
+    if st.button("Explain with AI"):
+        with st.spinner("Asking Kyro AI…"):
+            result = advisor.ai_explanation(plan, language=language)
+        st.session_state["ai_result"] = result
+    result = st.session_state.get("ai_result")
+    if result:
+        if result["source"] == "ai":
+            st.markdown(pill("AI-generated", "blue") + f"via {advisor.active_provider_label()}, checked against Kyro's computed numbers", unsafe_allow_html=True)
         else:
-
-            st.write(sustainability_results)
-
-    else:
-
-        show_pending_message("Sustainability module")
-
-        st.caption(
-            "Sustainability indicators will be displayed after "
-            "the team's calculation module is connected. "
-            "No estimated savings or environmental benefits "
-            "are assumed here."
-        )
+            banner(f"Showing the standard summary instead. {result['fallback_reason']}")
+        st.write(result["text"])
 
 
-# ============================================================
-# FOOTER
-# ============================================================
+def page_about() -> None:
+    st.header("About Kyro")
+    st.markdown(
+        "**Kyro** supports crop-rotation decisions for five Karnataka districts using NASA POWER "
+        "climate data and a sourced crop reference database."
+    )
+    banner(svc.DATA_NATURE, info=True)
+    st.subheader("Data sources")
+    st.markdown(
+        "- **NASA POWER** daily point API (community AG): temperature, precipitation, humidity, solar radiation.\n"
+        "- **NASA GPM IMERG** rainfall (January 2025 sample).\n"
+        "- **Crop database**: ICAR/TNAU/extension sources with access dates; rows marked *needs verification* use secondary sources."
+    )
+    st.subheader("Limitations")
+    st.markdown(
+        "- Climate values are grid averages for district centres, not your field.\n"
+        "- Season windows (kharif Jun–Oct, rabi Nov–Mar, summer Apr–May) are assumptions.\n"
+        "- Scores use prototype weights; no yield, water-saving or soil-restoration claims are made.\n"
+        "- Soil and water matching is simplified."
+    )
+    banner(svc.DISCLAIMER)
 
-st.divider()
 
-st.markdown("""
-<div class="footer-text">
-    <strong>FIELDWISE AI</strong><br>
-    NASA Space Apps Challenge 2026<br>
-    Climate Intelligence for Sustainable Agriculture
-</div>
-""", unsafe_allow_html=True)
+# ----------------------------------------------------------------- main
+_state()
+if "_nav" in st.session_state:
+    st.session_state["page"] = st.session_state.pop("_nav")
+_page = sidebar()
+{
+    "Home": page_home,
+    "Farm": page_farm,
+    "Recommendations": page_recommendations,
+    "Climate": page_climate,
+    "Sustainability": page_sustainability,
+    "Map": page_map,
+    "Advisor": page_advisor,
+    "About": page_about,
+}[_page]()

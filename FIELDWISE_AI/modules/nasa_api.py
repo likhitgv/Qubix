@@ -1,5 +1,5 @@
 """
-NASA POWER Daily API integration for FIELDWISE AI (Module M2).
+NASA POWER Daily API integration for Kyro (Module M2).
 
 Retrieves daily meteorological and solar data for Karnataka locations.
 API documentation:

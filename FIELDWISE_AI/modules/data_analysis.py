@@ -1,6 +1,6 @@
 
 """
-FIELDWISE AI - Environmental Data Analysis Module
+Kyro - Environmental Data Analysis Module
 """
 
 import pandas as pd
@@ -150,7 +150,7 @@ def generate_climate_trends(data):
 def load_nasa_power_data(file_path):
     """
     Load and convert actual NASA POWER climate data
-    into the format required by FIELDWISE AI.
+    into the format required by Kyro.
     """
 
     nasa_data = pd.read_csv(file_path)
@@ -222,7 +222,7 @@ def load_nasa_power_data(file_path):
 def generate_district_summaries(data):
     """
     Generate separate climate summaries
-    for all districts in FIELDWISE AI.
+    for all districts in Kyro.
     """
 
     district_summaries = []

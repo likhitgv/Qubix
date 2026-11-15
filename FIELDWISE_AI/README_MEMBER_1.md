@@ -1,6 +1,6 @@
 # Member 1 -- NASA Data Collection and Integration
 
-**Project:** FIELDWISE AI\
+**Project:** Kyro\
 **Role:** Member 1 -- NASA Data Collection Developer\
 **Repository:** [Qubix](https://github.com/likhitgv/Qubix)\
 **Data period:** 1 January 2025 -- 31 January 2025\

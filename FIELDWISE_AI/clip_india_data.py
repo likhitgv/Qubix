@@ -116,7 +116,7 @@ def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     print("=" * 55)
-    print("FIELDWISE AI - INDIA DATA CLIPPING")
+    print("Kyro - INDIA DATA CLIPPING")
     print("=" * 55)
 
     india = load_boundary()

@@ -1,4 +1,4 @@
-"""Load and validate FIELDWISE AI crop-reference records.
+"""Load and validate Kyro crop-reference records.
 
 The CSV is deliberately initialized with a schema only.  Crop records must be
 added from traceable sources before this module is used for recommendations.

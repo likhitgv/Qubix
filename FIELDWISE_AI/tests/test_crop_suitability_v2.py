@@ -1,5 +1,5 @@
 
-"""Automated tests for FIELDWISE AI M5 Suitability Engine V2."""
+"""Automated tests for Kyro M5 Suitability Engine V2."""
 
 import unittest
 
