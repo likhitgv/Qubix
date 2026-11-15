@@ -1,4 +1,4 @@
-"""Kyro service layer: one place that turns a farm profile into a plan.
+"""KAIRO service layer: one place that turns a farm profile into a plan.
 
 The UI calls these functions and only displays what they return. All data
 comes from NASA POWER files (or a live NASA POWER fetch); nothing is invented.
@@ -33,12 +33,12 @@ DATA_NATURE = (
     "cells), not a field or weather-station measurement."
 )
 DISCLAIMER = (
-    "Kyro is decision support, not agronomic advice. Confirm choices with a "
+    "KAIRO is decision support, not agronomic advice. Confirm choices with a "
     "local agronomist and a soil test."
 )
 
 # Farm points farther than this from every district centre are outside the
-# five Karnataka districts Kyro has data for.
+# five Karnataka districts KAIRO has data for.
 MAX_DISTRICT_DISTANCE_KM = 150.0
 
 

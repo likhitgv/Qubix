@@ -1,6 +1,6 @@
 
 """
-Kyro - Environmental Data Analysis Module
+KAIRO - Environmental Data Analysis Module
 """
 
 import pandas as pd
@@ -150,7 +150,7 @@ def generate_climate_trends(data):
 def load_nasa_power_data(file_path):
     """
     Load and convert actual NASA POWER climate data
-    into the format required by Kyro.
+    into the format required by KAIRO.
     """
 
     nasa_data = pd.read_csv(file_path)
@@ -222,7 +222,7 @@ def load_nasa_power_data(file_path):
 def generate_district_summaries(data):
     """
     Generate separate climate summaries
-    for all districts in Kyro.
+    for all districts in KAIRO.
     """
 
     district_summaries = []

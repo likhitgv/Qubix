@@ -1,4 +1,4 @@
-"""Kyro visual theme: dark glass UI with an emerald/cyan accent."""
+"""KAIRO visual theme: dark glass UI with an emerald/cyan accent."""
 
 import streamlit as st
 
@@ -36,10 +36,10 @@ section[data-testid="stSidebar"] {
 }
 .block-container { padding-top: 2rem; max-width: 1200px; }
 
-.kyro-brand { font-size: 1.9rem; font-weight: 800; letter-spacing: -.03em;
+.kairo-brand { font-size: 1.9rem; font-weight: 800; letter-spacing: -.03em;
   background: linear-gradient(90deg, #34d399, #22d3ee); -webkit-background-clip: text;
   -webkit-text-fill-color: transparent; margin: 0; }
-.kyro-tag { color: #94a3b8; font-size: .85rem; margin-top: -2px; }
+.kairo-tag { color: #94a3b8; font-size: .85rem; margin-top: -2px; }
 
 .hero { padding: 2.2rem 2rem; border-radius: 22px; margin-bottom: 1.4rem;
   background: linear-gradient(135deg, rgba(52,211,153,.14), rgba(34,211,238,.08));

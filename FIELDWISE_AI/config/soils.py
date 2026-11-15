@@ -1,4 +1,4 @@
-"""Soil and water vocabulary shared by the Kyro form and the scoring engines.
+"""Soil and water vocabulary shared by the KAIRO form and the scoring engines.
 
 The soil ids match the ``soil_types`` column of ``data/crop_database.csv``
 exactly, so a farmer's choice can always be matched against crop records.

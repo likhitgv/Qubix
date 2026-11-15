@@ -1,5 +1,5 @@
 
-"""Tests for Kyro Member 3 crop suitability engine."""
+"""Tests for KAIRO Member 3 crop suitability engine."""
 
 import unittest
 

@@ -182,7 +182,7 @@ def main():
     count = 0
 
     print("=" * 55)
-    print("Kyro - 2026 NASA POWER DATA DOWNLOAD")
+    print("KAIRO - 2026 NASA POWER DATA DOWNLOAD")
     print("Tiles:", len(tiles))
     print("Variables:", len(VARIABLES))
     print("Requests:", total)

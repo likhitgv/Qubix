@@ -1,4 +1,4 @@
-"""Kyro - NASA-data crop rotation decision support for Karnataka farms.
+"""KAIRO - NASA-data crop rotation decision support for Karnataka farms.
 
 Run:  py -3.11 -m streamlit run app.py
 UI only: all data handling and scoring lives in modules/.
@@ -25,12 +25,12 @@ from streamlit_folium import st_folium
 from dashboard.map_view import build_map
 from dashboard.theme import PLOT_LAYOUT, banner, inject_theme, metric_card, pill
 from modules import advisor
-from modules import kyro_service as svc
+from modules import kairo_service as svc
 from modules.crop_database import load_crop_database
 
 load_dotenv()  # reads .env (AI provider keys) if present
 
-st.set_page_config(page_title="Kyro", page_icon="🌱", layout="wide")
+st.set_page_config(page_title="KAIRO", page_icon="🌱", layout="wide")
 inject_theme()
 
 DISTRICT_NAMES = [d["name"] for d in DISTRICTS]
@@ -62,8 +62,8 @@ def _goto(page: str) -> None:
 # ----------------------------------------------------------------- sidebar
 def sidebar() -> str:
     with st.sidebar:
-        st.markdown('<p class="kyro-brand">Kyro</p>', unsafe_allow_html=True)
-        st.markdown('<div class="kyro-tag">Adapt your farm with NASA data</div>', unsafe_allow_html=True)
+        st.markdown('<p class="kairo-brand">KAIRO</p>', unsafe_allow_html=True)
+        st.markdown('<div class="kairo-tag">Adapt your farm with NASA data</div>', unsafe_allow_html=True)
         st.write("")
         page = st.radio("Navigate", PAGES, key="page", label_visibility="collapsed")
         st.write("")
@@ -84,7 +84,7 @@ def sidebar() -> str:
 def page_home() -> None:
     st.markdown(
         '<div class="hero"><h1>Choose the next crop with evidence, not guesswork.</h1>'
-        "<p>Kyro reads NASA POWER climate data for your district and ranks multi-season crop "
+        "<p>KAIRO reads NASA POWER climate data for your district and ranks multi-season crop "
         "rotations against a sourced crop database, with every score explained.</p></div>",
         unsafe_allow_html=True,
     )
@@ -103,7 +103,7 @@ def page_home() -> None:
 
 def page_farm() -> None:
     st.header("Your farm")
-    st.caption("Tell Kyro where your farm is and what it has.")
+    st.caption("Tell KAIRO where your farm is and what it has.")
 
     mode = st.radio("Location", ["Pick a district", "Use coordinates"], horizontal=True)
     district = None
@@ -142,7 +142,7 @@ def page_farm() -> None:
         else:
             banner(
                 f"This point is {geo['distance_km']} km from the nearest supported district "
-                f"({geo['district']}). Kyro only has data for five Karnataka districts.",
+                f"({geo['district']}). KAIRO only has data for five Karnataka districts.",
             )
 
     with st.form("farm_form"):
@@ -259,7 +259,7 @@ def page_recommendations() -> None:
     st.download_button(
         "Download recommendations (CSV)",
         _plan_csv(plan).to_csv(index=False).encode("utf-8"),
-        file_name=f"kyro_{plan['district'].lower()}_{date.today().isoformat()}.csv",
+        file_name=f"kairo_{plan['district'].lower()}_{date.today().isoformat()}.csv",
         mime="text/csv",
     )
     banner(plan["disclaimer"], info=True)
@@ -373,40 +373,40 @@ def page_sustainability() -> None:
 
 
 def page_advisor() -> None:
-    st.header("Kyro Advisor")
+    st.header("KAIRO Advisor")
     plan = _need_plan()
     if not plan:
         return
     st.markdown("#### Plain-language summary")
     st.write(advisor.template_explanation(plan))
-    st.caption("Built only from Kyro's computed results. Works offline.")
+    st.caption("Built only from KAIRO's computed results. Works offline.")
 
-    st.markdown("#### Ask Kyro AI")
+    st.markdown("#### Ask KAIRO AI")
     if not advisor.ai_available():
         banner(
             "AI explanations are off. Add a free provider key (GROQ_API_KEY, GEMINI_API_KEY or "
-            "OPENROUTER_API_KEY) to .env and restart Kyro. The summary above always works.",
+            "OPENROUTER_API_KEY) to .env and restart KAIRO. The summary above always works.",
             info=True,
         )
         return
     language = st.selectbox("Language", ["English", "Kannada", "Hindi"])
     if st.button("Explain with AI"):
-        with st.spinner("Asking Kyro AI…"):
+        with st.spinner("Asking KAIRO AI…"):
             result = advisor.ai_explanation(plan, language=language)
         st.session_state["ai_result"] = result
     result = st.session_state.get("ai_result")
     if result:
         if result["source"] == "ai":
-            st.markdown(pill("AI-generated", "blue") + f"via {advisor.active_provider_label()}, checked against Kyro's computed numbers", unsafe_allow_html=True)
+            st.markdown(pill("AI-generated", "blue") + f"via {advisor.active_provider_label()}, checked against KAIRO's computed numbers", unsafe_allow_html=True)
         else:
             banner(f"Showing the standard summary instead. {result['fallback_reason']}")
         st.write(result["text"])
 
 
 def page_about() -> None:
-    st.header("About Kyro")
+    st.header("About KAIRO")
     st.markdown(
-        "**Kyro** supports crop-rotation decisions for five Karnataka districts using NASA POWER "
+        "**KAIRO** supports crop-rotation decisions for five Karnataka districts using NASA POWER "
         "climate data and a sourced crop reference database."
     )
     banner(svc.DATA_NATURE, info=True)

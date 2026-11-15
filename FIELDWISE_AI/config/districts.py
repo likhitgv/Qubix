@@ -1,4 +1,4 @@
-"""District and region configuration for Kyro.
+"""District and region configuration for KAIRO.
 
 Coordinates are representative points for each district (district HQ area),
 NOT claims that every farm in the district shares the same climate or soil.

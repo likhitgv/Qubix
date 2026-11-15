@@ -1,4 +1,4 @@
-"""Kyro advisor: plain-language explanation of a computed plan.
+"""KAIRO advisor: plain-language explanation of a computed plan.
 
 Two layers:
   1. ``template_explanation`` - deterministic text built only from the plan.
@@ -8,7 +8,7 @@ Two layers:
      template) if it contains numbers that are not in those facts.
 
 Any OpenAI-compatible chat API works. Free options are preconfigured: Groq,
-Google Gemini and OpenRouter. Choose one with KYRO_AI_PROVIDER and set that
+Google Gemini and OpenRouter. Choose one with KAIRO_AI_PROVIDER and set that
 provider's key in the environment (see .env.example). Keys are never logged.
 """
 
@@ -22,7 +22,7 @@ from typing import Any, Callable, Optional
 import requests
 
 # Preset free-tier providers (OpenAI-compatible /chat/completions). Free-tier
-# model names change over time: override with KYRO_MODEL if a default is retired.
+# model names change over time: override with KAIRO_MODEL if a default is retired.
 PROVIDERS = {
     "groq": {
         "base_url": "https://api.groq.com/openai/v1",
@@ -44,8 +44,8 @@ DEFAULT_PROVIDER = "groq"
 REQUEST_TIMEOUT_S = 30
 
 SYSTEM_PROMPT = (
-    "You are Kyro, a careful farm-advisory explainer. You are given FACTS computed "
-    "by Kyro's modules for one farm. Explain the ranked crop rotations in plain, "
+    "You are KAIRO, a careful farm-advisory explainer. You are given FACTS computed "
+    "by KAIRO's modules for one farm. Explain the ranked crop rotations in plain, "
     "friendly language for a farmer.\n"
     "Rules:\n"
     "- Use ONLY numbers and crops present in FACTS. Never invent yields, prices, "
@@ -130,9 +130,14 @@ def template_explanation(plan: dict[str, Any]) -> str:
     return " ".join(lines)
 
 
+def _setting(name: str, default: str) -> str:
+    """Read KAIRO_<name>, falling back to the legacy KYRO_<name> spelling."""
+    return os.environ.get(f"KAIRO_{name}") or os.environ.get(f"KYRO_{name}") or default
+
+
 def provider_config() -> Optional[dict[str, str]]:
     """Resolve the active provider's settings, or None if unknown/no key."""
-    name = os.environ.get("KYRO_AI_PROVIDER", DEFAULT_PROVIDER).strip().lower()
+    name = _setting("AI_PROVIDER", DEFAULT_PROVIDER).strip().lower()
     preset = PROVIDERS.get(name)
     if preset is None:
         return None
@@ -142,8 +147,8 @@ def provider_config() -> Optional[dict[str, str]]:
     return {
         "provider": name,
         "api_key": key,
-        "base_url": os.environ.get("KYRO_AI_BASE_URL", preset["base_url"]).rstrip("/"),
-        "model": os.environ.get("KYRO_MODEL", preset["model"]),
+        "base_url": _setting("AI_BASE_URL", preset["base_url"]).rstrip("/"),
+        "model": _setting("MODEL", preset["model"]),
     }
 
 
@@ -152,7 +157,7 @@ def ai_available() -> bool:
 
 
 def active_provider_label() -> str:
-    name = os.environ.get("KYRO_AI_PROVIDER", DEFAULT_PROVIDER).strip().lower()
+    name = _setting("AI_PROVIDER", DEFAULT_PROVIDER).strip().lower()
     return name if name in PROVIDERS else f"{name} (unknown)"
 
 

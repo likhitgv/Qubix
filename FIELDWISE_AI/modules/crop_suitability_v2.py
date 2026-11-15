@@ -1,6 +1,6 @@
 
 """
-Kyro - Crop Suitability Engine V2
+KAIRO - Crop Suitability Engine V2
 
 Member 3: Crop Intelligence & Rotation Developer
 
