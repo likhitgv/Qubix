@@ -1,0 +1,12 @@
+{
+  "source": "datameet/maps Districts/Census_2011 (2011_Dist.shp, 2011_Dist.dbf)",
+  "url": "https://github.com/datameet/maps/tree/master/Districts/Census_2011",
+  "districts": 641,
+  "states": 35,
+  "centre_method": "area-weighted polygon centroid in degrees",
+  "limits": [
+    "Census 2011 boundaries: Telangana is inside Andhra Pradesh; later districts are missing.",
+    "Centres are reference points for NASA grid lookup, not farm locations."
+  ],
+  "built_at": "2026-11-15T10:52:24+00:00"
+}

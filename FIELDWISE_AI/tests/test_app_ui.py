@@ -120,14 +120,34 @@ class GeotagTests(unittest.TestCase):
         widget(at.segmented_control, "Method").set_value("Pin on map")
         at.run()
 
-    def test_coordinates_outside_coverage_warn(self):
+    def test_pin_outside_india_is_rejected(self):
         at = fresh()
         self._pin_mode(at)
-        widget(at.number_input, "Latitude").set_value(28.6)
-        widget(at.number_input, "Longitude").set_value(77.2)
+        widget(at.number_input, "Latitude").set_value(15.0)
+        widget(at.number_input, "Longitude").set_value(66.0)  # Arabian Sea
         at.run()
         self.assertFalse(at.exception, at.exception)
-        self.assertIn("only has data", page_text(at))
+        self.assertIn("outside the downloaded area", page_text(at))
+        widget(at.button, "Generate recommendations").click()
+        at.run()
+        self.assertIsNone(at.session_state["plan"])
+
+    def test_pin_in_another_state_works_with_karnataka_caution(self):
+        at = fresh()
+        self._pin_mode(at)
+        widget(at.number_input, "Latitude").set_value(26.91)
+        widget(at.number_input, "Longitude").set_value(75.79)  # Jaipur
+        at.run()
+        text = page_text(at)
+        self.assertIn("NASA grid cell", text)
+        self.assertIn("outside the five Karnataka districts", text)
+        widget(at.button, "Generate recommendations").click()
+        at.run()
+        self.assertFalse(at.exception, at.exception)
+        plan = at.session_state["plan"]
+        self.assertIsNotNone(plan["grid_id"])
+        self.assertTrue(plan["rotations"])
+        self.assertTrue(any("outside the five Karnataka" in w for w in plan["warnings"]))
 
     def test_map_click_sets_coordinates_and_nearest_district(self):
         at = fresh()
@@ -147,6 +167,65 @@ class GeotagTests(unittest.TestCase):
         at.run()
         self.assertFalse(at.exception, at.exception)
         self.assertEqual(at.session_state["plan"]["district"], "Dharwad")
+
+
+class StateDistrictTests(unittest.TestCase):
+    def test_defaults_to_karnataka_with_validated_district(self):
+        at = fresh()
+        go(at, "Farm")
+        self.assertEqual(widget(at.selectbox, "State / UT").value, "Karnataka")
+        self.assertIn("validated for", page_text(at))
+
+    def test_choosing_a_state_updates_district_options(self):
+        at = fresh()
+        go(at, "Farm")
+        widget(at.selectbox, "State / UT").set_value("Maharashtra")
+        at.run()
+        self.assertFalse(at.exception, at.exception)
+        options = widget(at.selectbox, "District").options
+        self.assertIn("Pune", options)
+        self.assertNotIn("Dharwad", options)
+
+    def test_state_district_flow_builds_plan_with_caution(self):
+        at = fresh()
+        go(at, "Farm")
+        widget(at.selectbox, "State / UT").set_value("Maharashtra")
+        at.run()
+        widget(at.selectbox, "District").set_value("Pune")
+        at.run()
+        widget(at.button, "Generate recommendations").click()
+        at.run()
+        self.assertFalse(at.exception, at.exception)
+        plan = at.session_state["plan"]
+        self.assertEqual(plan["district"], "Pune, Maharashtra")
+        self.assertIsNotNone(plan["grid_id"])
+        self.assertTrue(plan["rotations"])
+        self.assertTrue(any("outside the five Karnataka" in w for w in plan["warnings"]))
+
+    def test_andhra_pradesh_shows_telangana_note(self):
+        at = fresh()
+        go(at, "Farm")
+        widget(at.selectbox, "State / UT").set_value("Andhra Pradesh")
+        at.run()
+        captions = " ".join(str(c.value) for c in at.caption)
+        self.assertIn("Telangana", captions)
+        self.assertIn("Census 2011", captions)
+
+    def test_validated_district_has_no_caution(self):
+        at = fresh()
+        generate(at)
+        self.assertEqual(at.session_state["plan"]["district"], "Ballari")
+        self.assertFalse(any("outside the five Karnataka" in w for w in at.session_state["plan"]["warnings"]))
+
+    def test_changing_state_resets_stale_district(self):
+        at = fresh()
+        go(at, "Farm")
+        widget(at.selectbox, "District").set_value("Dharwad")
+        at.run()
+        widget(at.selectbox, "State / UT").set_value("Kerala")
+        at.run()
+        self.assertFalse(at.exception, at.exception)
+        self.assertIn(widget(at.selectbox, "District").value, widget(at.selectbox, "District").options)
 
 
 class AdvisorTests(unittest.TestCase):

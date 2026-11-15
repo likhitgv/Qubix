@@ -1,0 +1,24 @@
+{
+  "source": "NASA POWER (gridded, MERRA-2 based daily data)",
+  "data_nature": "Gridded, modelled values on a ~56 km grid; not field or weather-station measurements.",
+  "input_file": "data\\india_grid_2021_2025\\processed\\india_combined_2021_2026\\india_meteorological_daily_2021_2026.csv",
+  "period": [
+    "2021-01-01",
+    "2026-11-15"
+  ],
+  "grid_points": 882,
+  "variables": [
+    "T2M",
+    "T2M_MAX",
+    "T2M_MIN",
+    "PRECTOTCORR",
+    "RH2M"
+  ],
+  "season_windows": {
+    "kharif": "Jun-Oct",
+    "rabi": "Nov-Mar",
+    "summer": "Apr-May"
+  },
+  "built_at": "2026-11-15T10:43:17+00:00",
+  "note": "Seasons with missing days are marked complete=False and not used for recommendations."
+}

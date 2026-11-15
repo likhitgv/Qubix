@@ -26,6 +26,8 @@ from modules.rotation_engine import generate_crop_rotations
 from modules.sustainability import compare_rotations
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data" / "nasa_power"
+GRID_POINTS_PATH = Path(__file__).resolve().parents[1] / "data" / "india_grid_points.csv"
+GRID_SUMMARY_PATH = Path(__file__).resolve().parents[1] / "data" / "india_grid_seasonal_summary.csv"
 SEASONS = ["kharif", "rabi"]
 
 DATA_NATURE = (
@@ -40,6 +42,15 @@ DISCLAIMER = (
 # Farm points farther than this from every district centre are outside the
 # five Karnataka districts KAIRO has data for.
 MAX_DISTRICT_DISTANCE_KM = 150.0
+
+# The nationwide NASA grid is ~56 km apart, so a point inside India is at most ~40 km
+# from a grid point. Farther than this and the location is outside the downloaded area.
+MAX_GRID_DISTANCE_KM = 80.0
+
+OUTSIDE_KARNATAKA_NOTE = (
+    "This location is outside the five Karnataka districts KAIRO's crop reference data was "
+    "assembled for. Treat the crop ranking as indicative and confirm with local experts."
+)
 
 
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -94,6 +105,50 @@ def load_seasonal_summary(path: Optional[Path] = None) -> pd.DataFrame:
     return pd.read_csv(path)
 
 
+def load_grid_points(path: Optional[Path] = None) -> pd.DataFrame:
+    path = Path(path) if path else GRID_POINTS_PATH
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Grid points not found: {path}. Build them with: py -3.11 -m examples.build_india_seasonal_summary"
+        )
+    return pd.read_csv(path)
+
+
+def load_grid_summary(path: Optional[Path] = None) -> pd.DataFrame:
+    path = Path(path) if path else GRID_SUMMARY_PATH
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Grid seasonal summary not found: {path}. Build it with: py -3.11 -m examples.build_india_seasonal_summary"
+        )
+    return pd.read_csv(path)
+
+
+def nearest_grid_point(
+    latitude: float, longitude: float, points: Optional[pd.DataFrame] = None
+) -> dict[str, Any]:
+    """Find the closest downloaded NASA grid point (all-India coverage) to a location."""
+    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+        raise ValueError("Latitude must be -90..90 and longitude -180..180.")
+    pts = points if points is not None else load_grid_points()
+    distances = pts.apply(
+        lambda r: haversine_km(latitude, longitude, float(r["latitude"]), float(r["longitude"])), axis=1
+    )
+    idx = distances.idxmin()
+    row = pts.loc[idx]
+    km = float(distances.loc[idx])
+    return {
+        "grid_id": str(row["grid_id"]),
+        "latitude": float(row["latitude"]),
+        "longitude": float(row["longitude"]),
+        "distance_km": round(km, 1),
+        "within_coverage": km <= MAX_GRID_DISTANCE_KM,
+        "note": (
+            "Climate values come from the nearest NASA grid cell (about 56 km across), "
+            "not from the exact farm point."
+        ),
+    }
+
+
 def fetch_live_seasonal_summary(
     district: str, start: str = "2024-01-01", end: str = "2025-12-31"
 ) -> pd.DataFrame:
@@ -113,18 +168,24 @@ def build_plan(
 ) -> dict[str, Any]:
     """Build seasonal conditions, ranked rotations and sustainability output.
 
-    profile keys: district, soil_type (db id or None), water_availability
+    profile keys: district (display label) and/or grid_id (all-India NASA grid cell), soil_type (db id or None), water_availability
     ("rainfed"/"irrigated"/None), previous_crops (free text, optional).
     """
+    grid_id = profile.get("grid_id")
     district = profile.get("district")
-    if not district:
-        raise ValueError("A district is required.")
-    summary = seasonal_summary if seasonal_summary is not None else load_seasonal_summary()
+    if not district and not grid_id:
+        raise ValueError("A district or a grid location is required.")
+    label = district or grid_id
+    location_key = grid_id or district
+    if seasonal_summary is not None:
+        summary = seasonal_summary
+    else:
+        summary = load_grid_summary() if grid_id else load_seasonal_summary()
 
     try:
-        conditions = build_rotation_conditions(summary, district, SEASONS)
+        conditions = build_rotation_conditions(summary, location_key, SEASONS)
     except ValueError as error:
-        raise ValueError(f"No complete NASA season data for {district}: {error}") from error
+        raise ValueError(f"No complete NASA season data for {label}: {error}") from error
 
     crops = load_crop_database()
     farm = {
@@ -134,15 +195,21 @@ def build_plan(
     rotations = generate_crop_rotations(crops, conditions, farm, top_n=top_n)
     sustainability = compare_rotations(rotations, crops, profile.get("previous_crops"))
 
+    warnings = _plan_warnings(farm, rotations)
+    lat, lon = profile.get("latitude"), profile.get("longitude")
+    if grid_id and lat is not None and lon is not None and not nearest_district(lat, lon)["within_coverage"]:
+        warnings.append(OUTSIDE_KARNATAKA_NOTE)
+
     return {
-        "district": district,
+        "district": label,
+        "grid_id": grid_id,
         "conditions": conditions,
         "rotations": rotations,
         "sustainability": sustainability,
         "profile_used": farm,
         "data_nature": DATA_NATURE,
         "disclaimer": DISCLAIMER,
-        "warnings": _plan_warnings(farm, rotations),
+        "warnings": warnings,
     }
 
 
