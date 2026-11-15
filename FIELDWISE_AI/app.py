@@ -316,6 +316,8 @@ def page_farm() -> None:
                 st.session_state["_map_click"] = (round(last["lat"], 4), round(last["lng"], 4))
                 st.rerun()
 
+    _footer()
+
     if submitted:
         if district is None:
             st.error("Choose a state and district, or drop a pin inside India.")
@@ -666,6 +668,14 @@ def page_about() -> None:
         "- The crop list is short (six crops) and some figures are still being verified.\n"
         "- Scores use prototype weights; soil and water matching is simplified.\n"
         "- KAIRO makes no yield, water-saving or soil-restoration claims."
+    )
+    st.markdown("##### How KAIRO was built (use of AI)")
+    st.markdown(
+        "This project used AI tools. Anthropic's Claude (through Claude Code) helped the team write and review code, "
+        "tests and documentation and draft the interface; the team directed the work and reviewed the results. "
+        "An optional feature can send KAIRO's own computed results to a hosted language model to explain them in plain "
+        "language. That text is accepted only if every number in it matches KAIRO's computed data. "
+        "Crop reference data and all weather data come from the cited sources, not from AI."
     )
     ui.note(CHECK_LOCALLY, "good")
     _footer()

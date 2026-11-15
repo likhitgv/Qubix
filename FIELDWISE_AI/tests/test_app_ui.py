@@ -238,6 +238,25 @@ class StateDistrictTests(unittest.TestCase):
         self.assertIn(widget(at.selectbox, "District").value, widget(at.selectbox, "District").options)
 
 
+class DisclosureTests(unittest.TestCase):
+    """NASA Space Apps requires visible disclosure of AI use."""
+
+    def test_about_page_discloses_ai_use_and_nasa_data(self):
+        at = fresh()
+        go(at, "About")
+        self.assertFalse(at.exception, at.exception)
+        text = page_text(at)
+        self.assertIn("use of AI", text)
+        self.assertIn("Claude", text)
+        self.assertIn("NASA POWER", text)
+
+    def test_every_page_carries_the_nasa_attribution(self):
+        at = fresh()
+        for page in ["Home", "Farm", "Climate", "Map", "About"]:
+            go(at, page)
+            self.assertIn("NASA POWER", page_text(at), page)
+
+
 class SavedPlansTests(unittest.TestCase):
     """Plans are remembered in SQLite; each test uses its own throw-away database."""
 
