@@ -30,7 +30,7 @@ def generate(at, soil="Sandy loam"):
     go(at, "Farm")
     widget(at.pills, "Soil type").set_value(soil)
     at.run()
-    widget(at.button, "Generate recommendations").click()
+    widget(at.button, "Get recommendation").click()
     at.run()
 
 
@@ -39,10 +39,20 @@ def page_text(at):
 
 
 class NavigationTests(unittest.TestCase):
-    def test_home_renders(self):
+    def test_app_opens_on_the_field_setup(self):
         at = fresh()
         self.assertFalse(at.exception, at.exception)
-        self.assertIn("evidence", page_text(at))
+        self.assertEqual(at.session_state["page"], "Farm")
+        text = page_text(at)
+        for heading in ("Add your field details", "Where is your field?", "Select your soil type",
+                        "How is this field irrigated?", "What did you grow previously?"):
+            self.assertIn(heading, text)
+
+    def test_home_renders(self):
+        at = fresh()
+        go(at, "Home")
+        self.assertFalse(at.exception, at.exception)
+        self.assertIn("Plan your next crop", page_text(at))
 
     def test_every_page_renders_without_a_farm(self):
         at = fresh()
@@ -54,7 +64,7 @@ class NavigationTests(unittest.TestCase):
         at = fresh()
         for page in ["Recommendations", "Sustainability", "Advisor"]:
             go(at, page)
-            self.assertIn("No farm saved yet", page_text(at), page)
+            self.assertIn("Add your field details first", page_text(at), page)
 
     def test_deselecting_nav_keeps_current_page(self):
         at = fresh()
@@ -94,7 +104,7 @@ class FarmFlowTests(unittest.TestCase):
         go(at, "Farm")
         widget(at.segmented_control, "Water source").set_value("Borewell")
         at.run()
-        widget(at.button, "Generate recommendations").click()
+        widget(at.button, "Get recommendation").click()
         at.run()
         self.assertFalse(at.exception, at.exception)
         self.assertEqual(at.session_state["profile"]["water_availability"], "irrigated")
@@ -102,16 +112,16 @@ class FarmFlowTests(unittest.TestCase):
     def test_previous_crops_reach_the_plan(self):
         at = fresh()
         go(at, "Farm")
-        widget(at.pills, "What did you grow recently? (optional)").set_value(["Maize", "Finger millet"])
+        widget(at.pills, "Previous crops").set_value(["Maize", "Finger millet"])
         at.run()
-        widget(at.button, "Generate recommendations").click()
+        widget(at.button, "Get recommendation").click()
         at.run()
         self.assertEqual(at.session_state["profile"]["previous_crops"], "Maize, Finger millet")
 
     def test_flagged_crops_show_verification_badge(self):
         at = fresh()
         generate(at)
-        self.assertIn("Needs verification", page_text(at))
+        self.assertIn("needs verification", page_text(at))
 
 
 class GeotagTests(unittest.TestCase):
@@ -127,8 +137,8 @@ class GeotagTests(unittest.TestCase):
         widget(at.number_input, "Longitude").set_value(66.0)  # Arabian Sea
         at.run()
         self.assertFalse(at.exception, at.exception)
-        self.assertIn("outside the downloaded area", page_text(at))
-        widget(at.button, "Generate recommendations").click()
+        self.assertIn("outside the data KAIRO has", page_text(at))
+        widget(at.button, "Get recommendation").click()
         at.run()
         self.assertIsNone(at.session_state["plan"])
 
@@ -139,9 +149,9 @@ class GeotagTests(unittest.TestCase):
         widget(at.number_input, "Longitude").set_value(75.79)  # Jaipur
         at.run()
         text = page_text(at)
-        self.assertIn("NASA grid cell", text)
-        self.assertIn("outside the five Karnataka districts", text)
-        widget(at.button, "Generate recommendations").click()
+        self.assertIn("nearest area", text)
+        self.assertIn("outside the Karnataka districts KAIRO was tested in", text)
+        widget(at.button, "Get recommendation").click()
         at.run()
         self.assertFalse(at.exception, at.exception)
         plan = at.session_state["plan"]
@@ -163,7 +173,7 @@ class GeotagTests(unittest.TestCase):
         self._pin_mode(at)
         at.session_state["_map_click"] = (15.46, 75.01)  # Dharwad
         at.run()
-        widget(at.button, "Generate recommendations").click()
+        widget(at.button, "Get recommendation").click()
         at.run()
         self.assertFalse(at.exception, at.exception)
         self.assertEqual(at.session_state["plan"]["district"], "Dharwad")
@@ -174,7 +184,7 @@ class StateDistrictTests(unittest.TestCase):
         at = fresh()
         go(at, "Farm")
         self.assertEqual(widget(at.selectbox, "State / UT").value, "Karnataka")
-        self.assertIn("validated for", page_text(at))
+        self.assertIn("tested in this district", page_text(at))
 
     def test_choosing_a_state_updates_district_options(self):
         at = fresh()
@@ -193,7 +203,7 @@ class StateDistrictTests(unittest.TestCase):
         at.run()
         widget(at.selectbox, "District").set_value("Pune")
         at.run()
-        widget(at.button, "Generate recommendations").click()
+        widget(at.button, "Get recommendation").click()
         at.run()
         self.assertFalse(at.exception, at.exception)
         plan = at.session_state["plan"]
