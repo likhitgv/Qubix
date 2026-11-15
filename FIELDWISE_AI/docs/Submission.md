@@ -31,7 +31,10 @@ The same statement is shown inside the app (About page) and in the README.
 ## Links
 
 - Code (public): <https://github.com/likhitgv/Qubix>
-- Demo video / slides: `[paste your public YouTube or GitHub link here]`
+- Demo slides (7): <https://github.com/likhitgv/Qubix/blob/main/FIELDWISE_AI/docs/demo/KAIRO_Demo.pdf> (editable version: `KAIRO_Demo.pptx` in the same folder)
+- Demo video (28 s, captioned, AI-use mark on every frame): <https://github.com/likhitgv/Qubix/blob/main/FIELDWISE_AI/docs/demo/KAIRO_Demo_28s.mp4>
+  These GitHub links work once the demo PR is merged to `main`. For the most reliable video link, upload the MP4 to YouTube as Public or Unlisted and paste that instead.
+- Before submitting: put your team name in `TEAM` at the top of `docs/demo/build_demo.py` and re-run `py -3.11 docs/demo/build_demo.py`, or edit slides 1 and 7 of the PPTX.
 - Team: `[team name]`, `[member names, 1 to 6]`
 
 ## Demo: 7 slides maximum (or a video of 30 seconds or less), publicly viewable, no password
