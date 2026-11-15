@@ -1,4 +1,4 @@
-"""KAIRO - NASA-data crop rotation decision support for Karnataka farms.
+"""KAIRO - crop planning from NASA weather records.
 
 Run:  py -3.11 -m streamlit run app.py
 UI only: all data handling and scoring lives in modules/.
@@ -24,6 +24,7 @@ from config.soils import (
     water_availability_from_source,
 )
 from dashboard import components as ui
+from dashboard.advice import fit_reasons, main_caution, rotation_label, season_label
 from dashboard.map_view import build_map
 from dashboard.theme import ACCENT, ACCENT_2, ACCENT_3, inject_theme, plot_layout
 from modules import advisor
@@ -37,7 +38,7 @@ load_dotenv()  # reads .env (AI provider keys) if present
 st.set_page_config(
     page_title="KAIRO",
     page_icon="🌱",
-    layout="wide",
+    layout="centered",
     initial_sidebar_state="collapsed",
 )
 inject_theme()
@@ -45,16 +46,22 @@ inject_theme()
 DISTRICT_NAMES = [d["name"] for d in DISTRICTS]
 SOIL_LABELS = [label for _, label in SOIL_TYPES]
 PAGES = ["Home", "Farm", "Recommendations", "Climate", "Map", "Sustainability", "Advisor", "About"]
-NAV_ICONS = {
-    "Home": ":material/home:",
-    "Farm": ":material/agriculture:",
-    "Recommendations": ":material/auto_awesome:",
-    "Climate": ":material/thermostat:",
-    "Map": ":material/map:",
-    "Sustainability": ":material/eco:",
-    "Advisor": ":material/chat:",
-    "About": ":material/info:",
+NAV_LABELS = {
+    "Home": "Home",
+    "Farm": "Your field",
+    "Recommendations": "Recommendation",
+    "Climate": "Weather",
+    "Map": "Map",
+    "Sustainability": "Rotation health",
+    "Advisor": "Summary",
+    "About": "About",
 }
+CHECK_LOCALLY = "Check with a local agronomist before planting."
+NASA_SOURCE = (
+    "Weather data: NASA POWER (gridded model estimates for a ~56 km area, not measurements from your field). "
+    "KAIRO is decision support, not agronomic advice."
+)
+OUTSIDE_SHORT = "This place is outside the Karnataka districts KAIRO was tested in. Treat the advice as a starting point."
 
 
 # ----------------------------------------------------------------- data
@@ -100,77 +107,66 @@ def _goto(page: str) -> None:
 def _need_plan() -> dict | None:
     plan = st.session_state.plan
     if not plan:
-        ui.empty_state("🌾", "No farm saved yet", "Describe your farm first and KAIRO will build your plan.")
-        st.button("Set up my farm", type="primary", on_click=_goto, args=("Farm",), key=f"need_{st.session_state.get('page')}")
+        ui.empty_state("Add your field details first", "KAIRO needs your location, soil and water to suggest a plan.")
+        st.button("Add your field details", type="primary", on_click=_goto, args=("Farm",), key=f"need_{st.session_state.get('page')}")
     return plan
 
 
 def _footer() -> None:
-    ui.render(
-        '<div class="footer">KAIRO · NASA POWER data is gridded and modelled · '
-        "Decision support, not agronomic advice</div>"
-    )
+    ui.render(ui.source_line(NASA_SOURCE))
+
+
+def _friendly(warning: str) -> str:
+    """Shorter wording for the longer service warnings."""
+    if warning == svc.OUTSIDE_KARNATAKA_NOTE:
+        return OUTSIDE_SHORT
+    return warning
 
 
 # ----------------------------------------------------------------- chrome
 def top_bar() -> str:
-    # Pending navigation and "never deselect" guard run before the widget exists.
+    # Pending navigation and the "never deselect" guard run before the widget exists.
     if "_nav" in st.session_state:
         st.session_state["page"] = st.session_state.pop("_nav")
+    if "page" not in st.session_state:
+        st.session_state["page"] = "Farm"  # the field setup is the main experience
     if st.session_state.get("page") is None:
-        st.session_state["page"] = st.session_state.get("_last_page", "Home")
+        st.session_state["page"] = st.session_state.get("_last_page", "Farm")
 
-    brand, chip = st.columns([1, 1], vertical_alignment="center")
-    brand.markdown(ui.topbar_brand(), unsafe_allow_html=True)
-    chip.markdown(ui.farm_chip(st.session_state.profile), unsafe_allow_html=True)
+    brand, chip = st.columns([3, 2], vertical_alignment="center")
+    brand.markdown(ui.brand(), unsafe_allow_html=True)
+    chip.markdown(ui.field_note(st.session_state.profile), unsafe_allow_html=True)
     page = st.segmented_control(
         "Navigate", PAGES, key="page", label_visibility="collapsed",
-        format_func=lambda p: f"{NAV_ICONS[p]} {p}",
+        format_func=lambda p: NAV_LABELS[p],
     )
-    page = page or st.session_state.get("_last_page", "Home")
+    page = page or st.session_state.get("_last_page", "Farm")
     st.session_state["_last_page"] = page
     return page
 
 
 # ----------------------------------------------------------------- Home
 def page_home() -> None:
-    ui.render(
-        '<div class="hero"><span class="eyebrow">● NASA Space Apps Challenge 2026</span>'
-        "<h1>Choose your next crop with <em>evidence</em>, not guesswork.</h1>"
-        "<p>KAIRO turns NASA climate data for your district into ranked multi-season "
-        "crop rotations, and explains every score.</p></div>"
+    ui.render(ui.page_header(
+        "Plan your next crop with NASA weather records",
+        "Add your field details and KAIRO suggests a crop plan for the coming seasons, with the reasons shown.",
+    ))
+    st.button("Add your field details", type="primary", on_click=_goto, args=("Farm",), key="cta_farm")
+    st.write("")
+    ui.render(ui.grid([
+        '<div class="panel"><h4>1. Add your field</h4><p>Choose where it is, your soil type and how it gets water.</p></div>',
+        '<div class="panel"><h4>2. We read the weather</h4><p>KAIRO averages past seasons of NASA weather data for your location.</p></div>',
+        '<div class="panel"><h4>3. See the plan and why</h4><p>You get a best option, two alternatives and the reasons behind them.</p></div>',
+    ], cols=3))
+    ui.note(
+        f"Works anywhere in India using NASA weather data. KAIRO's crop information was tested in five Karnataka districts. {CHECK_LOCALLY}",
     )
-    c1, c2, _ = st.columns([3, 2.4, 4])
-    c1.button("Start with your farm", type="primary", on_click=_goto, args=("Farm",), key="cta_farm", width="stretch")
-    c2.button("Explore the map", on_click=_goto, args=("Map",), key="cta_map", width="stretch")
-    st.write("")
-
-    n_crops = len(load_crop_database())
-    stats = [
-        ("📍", "Coverage", "All India", "882 NASA grid points · 5 Karnataka districts validated"),
-        ("🛰️", "NASA POWER", "2021–2026", "Daily temperature, rain and humidity per grid cell"),
-        ("🌾", "Crops", str(n_crops), "Sourced; unverified rows are flagged"),
-        ("🔁", "Seasons", "Kharif + Rabi", "Rotation scored across both"),
-    ]
-    ui.render(ui.grid([ui.stat(*s) for s in stats], four=True))
-
-    st.write("")
-    ui.render(ui.section("How it works", "Three steps to a plan"))
-    steps = [
-        ("Describe your farm", "Pick a district or drop a pin on the map, then set soil, water source and past crops."),
-        ("We read NASA data", "KAIRO averages complete kharif and rabi seasons from NASA POWER for your location."),
-        ("Get ranked rotations", "See the best crop sequences with score breakdowns, sources and honest limitations."),
-    ]
-    ui.render(ui.grid([ui.step_card(i, t, x) for i, (t, x) in enumerate(steps, start=1)], three=True))
-
-    st.write("")
-    ui.banner(svc.DISCLAIMER, "info")
     _footer()
 
 
 # ----------------------------------------------------------------- Farm
 def page_farm() -> None:
-    ui.render(ui.section("Step 1", "Tell us about your farm", "Everything here shapes your recommendations. You can change it any time."))
+    ui.render(ui.page_header("Add your field details", "Four short questions. You can change any answer later."))
 
     # Apply a map click from the previous run before the inputs exist.
     click = st.session_state.pop("_map_click", None)
@@ -185,108 +181,108 @@ def page_farm() -> None:
     st.session_state.setdefault("farm_prev", [])
     st.session_state.setdefault("loc_mode", "District")
 
-    left, right = st.columns([1.05, 1], gap="large")
+    left, right = st.columns([1.15, 1], gap="large")
     district = None
     district_rec = None
     lat = lon = None
     geo = None
+    state = dname = None
 
     with left:
-        with st.container(border=True):
-            st.markdown("##### :material/location_on: Location")
-            mode = st.segmented_control("Method", ["District", "Pin on map"], key="loc_mode", label_visibility="collapsed")
-            mode = mode or "District"
-            if mode == "District":
-                st.session_state.setdefault("farm_state", "Karnataka")
-                c1, c2 = st.columns(2)
-                state = c1.selectbox("State / UT", list_states(), key="farm_state")
-                names = [d["district"] for d in districts_in_state(state)]
-                if st.session_state.get("farm_district") not in names:
-                    st.session_state["farm_district"] = names[0]
-                dname = c2.selectbox("District", names, key="farm_district")
-                district_rec = get_india_district(state, dname)
-                district = district_rec["label"]
-                note = "Districts follow Census 2011 boundaries; districts created since then are not listed."
-                if state == "Andhra Pradesh":
-                    note += " Telangana's districts appear here because Telangana was part of Andhra Pradesh in 2011."
-                st.caption(note)
-                if district_rec["validated"]:
-                    ui.banner("This is one of the five districts KAIRO was validated for.", "ok")
-                else:
-                    ui.banner(svc.OUTSIDE_KARNATAKA_NOTE)
+        # 1 ----- location
+        ui.render(ui.step(1, "Where is your field?", "Choose a state and district, or drop a pin on the map."))
+        mode = st.segmented_control("Method", ["District", "Pin on map"], key="loc_mode", label_visibility="collapsed")
+        mode = mode or "District"
+        if mode == "District":
+            st.session_state.setdefault("farm_state", "Karnataka")
+            c1, c2 = st.columns(2)
+            state = c1.selectbox("State / UT", list_states(), key="farm_state")
+            names = [d["district"] for d in districts_in_state(state)]
+            if st.session_state.get("farm_district") not in names:
+                st.session_state["farm_district"] = names[0]
+            dname = c2.selectbox("District", names, key="farm_district")
+            district_rec = get_india_district(state, dname)
+            district = district_rec["label"]
+            note = "Districts follow Census 2011 boundaries; newer districts are not listed."
+            if state == "Andhra Pradesh":
+                note += " Telangana's districts appear here because Telangana was part of Andhra Pradesh in 2011."
+            st.caption(note)
+            if district_rec["validated"]:
+                ui.note("KAIRO's crop information was tested in this district.", "good")
             else:
-                c1, c2 = st.columns(2)
-                lat = c1.number_input("Latitude", -90.0, 90.0, format="%.4f", key="farm_lat")
-                lon = c2.number_input("Longitude", -180.0, 180.0, format="%.4f", key="farm_lon")
-                geo = svc.nearest_grid_point(lat, lon, _grid_points())
-                near = svc.nearest_district(lat, lon)
-                if geo["within_coverage"]:
-                    ui.banner(
-                        f"NASA grid cell <b>{geo['grid_id']}</b> is {geo['distance_km']} km from your pin. {geo['note']}",
-                        "ok",
-                    )
-                    if near["within_coverage"]:
-                        district = near["district"]
-                        ui.banner(
-                            f"Closest validated district: <b>{near['district']}</b> ({near['distance_km']} km away).",
-                            "info",
-                        )
-                    else:
-                        district = f"Pin {lat:.2f}°N, {lon:.2f}°E"
-                        ui.banner(svc.OUTSIDE_KARNATAKA_NOTE)
+                ui.note(OUTSIDE_SHORT, "caution")
+        else:
+            c1, c2 = st.columns(2)
+            lat = c1.number_input("Latitude", -90.0, 90.0, format="%.4f", key="farm_lat")
+            lon = c2.number_input("Longitude", -180.0, 180.0, format="%.4f", key="farm_lon")
+            geo = svc.nearest_grid_point(lat, lon, _grid_points())
+            near = svc.nearest_district(lat, lon)
+            if geo["within_coverage"]:
+                ui.note(f"Using NASA weather data for the nearest area, {geo['distance_km']} km from your pin.", "good")
+                if near["within_coverage"]:
+                    district = near["district"]
+                    ui.note(f"Closest tested district: {near['district']} ({near['distance_km']} km away).")
                 else:
-                    ui.banner(
-                        f"This point is {geo['distance_km']} km from the nearest NASA grid cell, so it is outside "
-                        "the downloaded area (India). Move the pin onto the map of India."
-                    )
+                    district = f"Pin {lat:.2f}°N, {lon:.2f}°E"
+                    ui.note(OUTSIDE_SHORT, "caution")
+            else:
+                ui.note(
+                    f"This point is {geo['distance_km']} km from the nearest NASA weather area, so it is outside the "
+                    "data KAIRO has for India. Move the pin onto India.",
+                    "caution",
+                )
+        st.slider("Field size (hectares)", 0.5, 100.0, step=0.5, key="farm_area")
 
-        with st.container(border=True):
-            st.markdown("##### :material/landscape: Soil and water")
-            soil_label = st.pills("Soil type", SOIL_LABELS + ["Not sure"], selection_mode="single", key="farm_soil")
-            water_label = st.segmented_control("Water source", WATER_SOURCES, key="farm_water")
-            st.slider("Farm size (hectares)", 0.5, 100.0, step=0.5, key="farm_area")
+        # 2 ----- soil
+        ui.render(ui.step(2, "Select your soil type", "Not sure? Choose “Not sure” and KAIRO will leave soil out when ranking."))
+        soil_label = st.pills("Soil type", SOIL_LABELS + ["Not sure"], selection_mode="single", key="farm_soil")
 
-        with st.container(border=True):
-            st.markdown("##### :material/history: Previous crops")
-            previous = st.pills(
-                "What did you grow recently? (optional)",
-                [c["crop_name"] for c in load_crop_database()],
-                selection_mode="multi", key="farm_prev",
-            )
+        # 3 ----- water
+        ui.render(ui.step(3, "How is this field irrigated?", "Rainfed means the crop depends on rain only."))
+        water_label = st.segmented_control("Water source", WATER_SOURCES, key="farm_water")
+
+        # 4 ----- previous crops
+        ui.render(ui.step(4, "What did you grow previously?", "Optional. It helps avoid planting the same crop family twice."))
+        previous = st.pills(
+            "Previous crops",
+            [c["crop_name"] for c in load_crop_database()],
+            selection_mode="multi", key="farm_prev",
+        )
+
+        st.write("")
+        submitted = st.button("Get recommendation", type="primary", key="generate")
 
     with right:
-        with st.container(border=True):
-            if mode == "District":
-                st.markdown("##### :material/map: Selected district")
-                dlat, dlon = district_rec["latitude"], district_rec["longitude"]
-                gid = _grid_id_for(dlat, dlon)
-                gpt = None
-                if gid:
-                    row = _grid_points().set_index("grid_id").loc[gid]
-                    gpt = (float(row["latitude"]), float(row["longitude"]))
-                preview = build_map(
-                    district_rec["district"] if district_rec["validated"] else None,
-                    (dlat, dlon), _summary(), grid_link=gpt, center=(dlat, dlon), zoom=8,
-                )
-                st_folium(preview, height=430, use_container_width=True, returned_objects=[], key=f"farm_map_district_{state}_{dname}")
-            else:
-                st.markdown("##### :material/touch_app: Click the map to place your farm")
-                clicked = st_folium(
-                    build_map(
-                        district if geo and geo["within_coverage"] and district in DISTRICT_NAMES else None,
-                        (lat, lon), _summary(), grid_points=_grid_points(),
-                        grid_link=(geo["latitude"], geo["longitude"]) if geo and geo["within_coverage"] else None,
-                        india_view=True,
-                    ),
-                    height=430, use_container_width=True, returned_objects=["last_clicked"], key="farm_map_pin",
-                )
-                last = (clicked or {}).get("last_clicked")
-                if last and (round(last["lat"], 4), round(last["lng"], 4)) != (round(lat, 4), round(lon, 4)):
-                    st.session_state["_map_click"] = (round(last["lat"], 4), round(last["lng"], 4))
-                    st.rerun()
+        if mode == "District":
+            ui.render('<div class="page-sub" style="margin:.2rem 0 .4rem">Your field on the map</div>')
+            dlat, dlon = district_rec["latitude"], district_rec["longitude"]
+            gid = _grid_id_for(dlat, dlon)
+            gpt = None
+            if gid:
+                row = _grid_points().set_index("grid_id").loc[gid]
+                gpt = (float(row["latitude"]), float(row["longitude"]))
+            preview = build_map(
+                district_rec["district"] if district_rec["validated"] else None,
+                (dlat, dlon), _summary(), grid_link=gpt, center=(dlat, dlon), zoom=8,
+            )
+            st_folium(preview, height=430, use_container_width=True, returned_objects=[], key=f"farm_map_district_{state}_{dname}")
+        else:
+            ui.render('<div class="page-sub" style="margin:.2rem 0 .4rem">Click the map to place your field</div>')
+            clicked = st_folium(
+                build_map(
+                    district if geo and geo["within_coverage"] and district in DISTRICT_NAMES else None,
+                    (lat, lon), _summary(), grid_points=_grid_points(),
+                    grid_link=(geo["latitude"], geo["longitude"]) if geo and geo["within_coverage"] else None,
+                    india_view=True,
+                ),
+                height=430, use_container_width=True, returned_objects=["last_clicked"], key="farm_map_pin",
+            )
+            last = (clicked or {}).get("last_clicked")
+            if last and (round(last["lat"], 4), round(last["lng"], 4)) != (round(lat, 4), round(lon, 4)):
+                st.session_state["_map_click"] = (round(last["lat"], 4), round(last["lng"], 4))
+                st.rerun()
 
-    st.write("")
-    if st.button("Generate recommendations", type="primary", key="generate"):
+    if submitted:
         if district is None:
             st.error("Choose a state and district, or drop a pin inside India.")
             return
@@ -319,11 +315,7 @@ def page_farm() -> None:
         st.rerun()
 
 
-# ----------------------------------------------------------------- Recommendations
-def _rotation_label(rot: dict) -> str:
-    return " → ".join(c["crop_name"] for c in rot["crop_sequence"])
-
-
+# ----------------------------------------------------------------- Recommendation
 def _plan_csv(plan: dict) -> pd.DataFrame:
     rows = []
     for rot in plan["rotations"]:
@@ -337,41 +329,6 @@ def _plan_csv(plan: dict) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _rotation_card(rot: dict, sus: dict) -> None:
-    with st.container(border=True):
-        left, right = st.columns([1, 6], vertical_alignment="center")
-        left.markdown(ui.ring(rot["overall_rotation_score"], "match"), unsafe_allow_html=True)
-        flagged = sorted({c["crop_name"] for c in rot["crop_sequence"] if c.get("source_warnings")})
-        chips = [("Best match", "green")] if rot["rank"] == 1 else []
-        if sus.get("available"):
-            chips.append((f"Sustainability {sus['indicator_score']}", "cyan"))
-            chips.append(("Includes legume", "green") if sus["legume_count"] else ("No legume", "gray"))
-        if flagged:
-            chips.append((f"Needs verification: {', '.join(flagged)}", "amber"))
-        right.markdown(
-            f'<div class="kicker">Rotation #{rot["rank"]}</div>{ui.sequence(rot["crop_sequence"])}{ui.tags(chips)}',
-            unsafe_allow_html=True,
-        )
-        with st.expander("Why this score?"):
-            cols = st.columns(len(rot["crop_sequence"]))
-            for col, crop in zip(cols, rot["crop_sequence"]):
-                details = crop.get("suitability_details", {})
-                with col:
-                    st.markdown(f"**{crop['crop_name']}** · {crop['season'].title()}")
-                    st.markdown(ui.score_bars(details.get("component_scores", {})), unsafe_allow_html=True)
-                    for line in details.get("explanations", []):
-                        st.caption(f"• {line}")
-                    for warning in crop.get("source_warnings", []):
-                        st.caption(f"⚠ {warning}")
-                    if crop.get("source_urls"):
-                        st.caption(f"Sources: {crop['source_urls']}")
-            for note in rot.get("explanations", []):
-                st.caption(f"Rotation: {note}")
-            for limit in rot.get("limitations", []):
-                st.caption(f"Limitation: {limit}")
-    st.write("")
-
-
 def _radar(rot: dict) -> go.Figure:
     totals: dict[str, list[float]] = {}
     for crop in rot["crop_sequence"]:
@@ -382,107 +339,161 @@ def _radar(rot: dict) -> go.Figure:
     values = [sum(v) / len(v) for v in totals.values()]
     fig = go.Figure(go.Scatterpolar(
         r=values + values[:1], theta=[n.title() for n in names] + [names[0].title()],
-        fill="toself", line=dict(color=ACCENT, width=3), fillcolor="rgba(52,211,153,.22)",
+        fill="toself", line=dict(color=ACCENT, width=2), fillcolor="rgba(31,77,43,.18)",
     ))
-    fig.update_layout(**plot_layout(height=360, showlegend=False), polar=dict(
+    fig.update_layout(**plot_layout(height=340, showlegend=False), polar=dict(
         bgcolor="rgba(0,0,0,0)",
-        radialaxis=dict(range=[0, 100], gridcolor="rgba(148,163,184,.18)", tickfont=dict(size=9)),
-        angularaxis=dict(gridcolor="rgba(148,163,184,.18)"),
+        radialaxis=dict(range=[0, 100], gridcolor="#E3D9C0", tickfont=dict(size=9)),
+        angularaxis=dict(gridcolor="#E3D9C0"),
     ))
     return fig
 
 
+def _how_calculated(plan: dict) -> None:
+    with st.expander("How this was calculated"):
+        st.markdown(
+            "KAIRO compares each crop's needs (temperature, rainfall, soil, water and season) with the weather "
+            "records for your location and the answers you gave. Crops are combined into two-season plans, "
+            "with a small bonus for including a legume and a penalty for repeating a crop family."
+        )
+        t_scores, t_compare, t_method = st.tabs(["Score details", "Compare options", "Method and limits"])
+        with t_scores:
+            for rot, sus in zip(plan["rotations"], plan["sustainability"]):
+                st.markdown(f"**Option {rot['rank']}: {rotation_label(rot)}**  ·  fit score {rot['overall_rotation_score']:.0f} of 100")
+                cols = st.columns(len(rot["crop_sequence"]))
+                for col, crop in zip(cols, rot["crop_sequence"]):
+                    details = crop.get("suitability_details", {})
+                    with col:
+                        st.markdown(f"{crop['crop_name']} · {crop['season'].title()}")
+                        st.markdown(ui.score_bars(details.get("component_scores", {})), unsafe_allow_html=True)
+                        for line in details.get("explanations", []):
+                            st.caption(f"• {line}")
+                        for warning in crop.get("source_warnings", []):
+                            st.caption(f"Data note: {warning}")
+                        if crop.get("source_urls"):
+                            st.caption(f"Sources: {crop['source_urls']}")
+                for line in rot.get("explanations", []):
+                    st.caption(f"Plan: {line}")
+                st.divider()
+        with t_compare:
+            labels = [f"Option {r['rank']}: {rotation_label(r)}" for r in plan["rotations"]]
+            fig = go.Figure()
+            fig.add_bar(y=labels, x=[r["overall_rotation_score"] for r in plan["rotations"]], name="Fit score",
+                        orientation="h", marker_color=ACCENT)
+            fig.add_bar(y=labels, x=[r["average_crop_suitability"] for r in plan["rotations"]], name="Average crop fit",
+                        orientation="h", marker_color=ACCENT_3)
+            fig.update_layout(**plot_layout(height=130 + 80 * len(labels), barmode="group", xaxis=dict(range=[0, 100])))
+            fig.update_yaxes(autorange="reversed")
+            st.plotly_chart(fig, width="stretch")
+            pick = st.segmented_control("Component profile of", [f"#{r['rank']}" for r in plan["rotations"]], default="#1", key="radar_pick")
+            idx = int((pick or "#1").lstrip("#")) - 1
+            st.plotly_chart(_radar(plan["rotations"][min(idx, len(plan["rotations"]) - 1)]), width="stretch")
+        with t_method:
+            st.markdown("How much each part counts toward a crop's score (%):")
+            ui.render(ui.score_bars({k: v for k, v in WEIGHTS.items()}))
+            st.caption("These weights are prototype design choices, not calibrated agronomic values.")
+            st.markdown("**Limits to keep in mind**")
+            seen = set()
+            for rot in plan["rotations"]:
+                for line in rot.get("limitations", []):
+                    if line not in seen:
+                        seen.add(line)
+                        st.caption(f"• {line}")
+            st.caption(f"• {svc.DATA_NATURE}")
+            st.caption(f"• {INDICATOR_NOTE}")
+
+
 def page_recommendations() -> None:
-    ui.render(ui.section("Your plan", "Recommended rotations", "Ranked by how well each crop sequence fits your climate, soil and water."))
     plan = _need_plan()
     if not plan:
         return
-    for note in plan["warnings"]:
-        ui.banner(note)
-
-    cond = {c["season"]: c["environmental_data"] for c in plan["conditions"]}
-    best = plan["rotations"][0]["overall_rotation_score"] if plan["rotations"] else None
-    kpis = [
-        '<div class="card" style="display:flex;gap:1rem;align-items:center">'
-        f'{ui.ring(best, "best")}<div><div class="lbl" style="color:#8b9ab0;font-size:.72rem;text-transform:uppercase;letter-spacing:.1em">Top rotation</div>'
-        f'<div style="font-weight:700;margin-top:2px">{plan["district"]}</div></div></div>'
-    ]
-    icons = {"kharif": "🌧️", "rabi": "🌤️", "summer": "☀️"}
-    for season, env in cond.items():
-        years = env.get("season_years_used") or []
-        basis = f"avg of {len(years)} seasons ({min(years)}–{max(years)})" if years else "NASA POWER avg"
-        kpis.append(ui.stat(icons.get(season, "🌱"), f"{season.title()} climate", f"{env['temperature_c']:.1f} °C",
-                            f"{env['rainfall_mm']:.0f} mm rain · {basis}"))
-    ui.render(ui.grid(kpis, 230))
+    profile = st.session_state.profile
+    ui.render(ui.page_header("Recommended for this season", f"For your field in {plan['district']}, based on NASA weather records, your soil and your water."))
+    for warning in plan["warnings"]:
+        ui.note(_friendly(warning), "caution")
 
     if not plan["rotations"]:
-        ui.empty_state("🔍", "No rotation met the requirements", "Try a different soil type or water source.")
+        ui.empty_state("No plan fits these answers", "Try a different soil type or water source.")
+        _footer()
         return
 
-    tab_rank, tab_compare, tab_method = st.tabs(["Ranked rotations", "Compare", "How scoring works"])
-    with tab_rank:
-        for rot, sus in zip(plan["rotations"], plan["sustainability"]):
-            _rotation_card(rot, sus)
-        st.download_button(
-            "Download recommendations (CSV)",
-            _plan_csv(plan).to_csv(index=False).encode("utf-8"),
-            file_name=f"kairo_{_slug(plan['district'])}_{date.today().isoformat()}.csv",
-            mime="text/csv",
-        )
-    with tab_compare:
-        labels = [f"#{r['rank']} {_rotation_label(r)}" for r in plan["rotations"]]
-        fig = go.Figure()
-        fig.add_bar(y=labels, x=[r["overall_rotation_score"] for r in plan["rotations"]], name="Rotation score",
-                    orientation="h", marker_color=ACCENT)
-        fig.add_bar(y=labels, x=[r["average_crop_suitability"] for r in plan["rotations"]], name="Avg crop suitability",
-                    orientation="h", marker_color=ACCENT_2)
-        fig.update_layout(**plot_layout(height=130 + 90 * len(labels), barmode="group", xaxis=dict(range=[0, 100])))
-        fig.update_yaxes(autorange="reversed")
-        st.plotly_chart(fig, width="stretch")
-        pick = st.segmented_control("Component profile of", [f"#{r['rank']}" for r in plan["rotations"]], default="#1", key="radar_pick")
-        idx = int((pick or "#1").lstrip("#")) - 1
-        st.plotly_chart(_radar(plan["rotations"][min(idx, len(plan["rotations"]) - 1)]), width="stretch")
-    with tab_method:
-        st.markdown("Each crop is scored from five components, then combined into a rotation score. Weight of each component (%):")
-        ui.render(ui.score_bars({k: v for k, v in WEIGHTS.items()}))
-        st.caption(
-            "Weights are prototype design choices, not calibrated agronomic values. "
-            "Rotation scores add a bonus for legumes and a penalty for repeating a crop family."
-        )
-    ui.banner(plan["disclaimer"], "info")
+    cond = {c["season"]: c["environmental_data"] for c in plan["conditions"]}
+    best, sus = plan["rotations"][0], plan["sustainability"][0]
+    ui.render(ui.reco_card(
+        label="Best option",
+        title=rotation_label(best),
+        seasons=season_label(best),
+        fit=f"Fit score {best['overall_rotation_score']:.0f} out of 100",
+        reasons=fit_reasons(best, sus),
+        caution=main_caution(best, cond, profile),
+        check=CHECK_LOCALLY,
+    ))
+    flagged = sorted({c["crop_name"] for c in best["crop_sequence"] if c.get("source_warnings")})
+    if flagged:
+        ui.note(f"Reference data for {', '.join(flagged)} still needs verification. Details are under “How this was calculated”.")
+
+    others = list(zip(plan["rotations"][1:3], plan["sustainability"][1:3]))
+    if others:
+        ui.render('<h3 style="margin:1.6rem 0 .5rem">Two alternatives</h3>' if len(others) == 2 else '<h3 style="margin:1.6rem 0 .5rem">Alternative</h3>')
+        cols = st.columns(len(others))
+        for col, (rot, _) in zip(cols, others):
+            col.markdown(
+                ui.alt_card(
+                    f"Option {rot['rank']}", rotation_label(rot),
+                    f"{season_label(rot)} · fit score {rot['overall_rotation_score']:.0f}",
+                    main_caution(rot, cond, profile),
+                ),
+                unsafe_allow_html=True,
+            )
+
+    ui.render('<h3 style="margin:1.8rem 0 .3rem">The weather behind this advice</h3>')
+    items = []
+    for season, env in cond.items():
+        years = env.get("season_years_used") or []
+        basis = f"average of {len(years)} seasons, {min(years)}–{max(years)}" if years else "NASA POWER average"
+        items.append((f"{season.title()} season", f"{env['temperature_c']:.1f} °C · {env['rainfall_mm']:.0f} mm", basis))
+    ui.render(ui.facts(items))
+
+    _how_calculated(plan)
+    st.write("")
+    st.download_button(
+        "Download as CSV",
+        _plan_csv(plan).to_csv(index=False).encode("utf-8"),
+        file_name=f"kairo_{_slug(plan['district'])}_{date.today().isoformat()}.csv",
+        mime="text/csv",
+    )
     _footer()
 
 
-# ----------------------------------------------------------------- Climate
+# ----------------------------------------------------------------- Weather
 def page_climate() -> None:
-    ui.render(ui.section("NASA POWER", "Climate", svc.DATA_NATURE))
+    ui.render(ui.page_header("Weather records", "NASA estimates for the area around each district, 2024–2025."))
     plan = st.session_state.plan
-    st.session_state.setdefault("climate_district", plan["district"] if plan else DISTRICT_NAMES[0])
+    default = plan["district"] if plan and plan["district"] in DISTRICT_NAMES else DISTRICT_NAMES[0]
+    st.session_state.setdefault("climate_district", default)
     district = st.pills("District", DISTRICT_NAMES, selection_mode="single", key="climate_district") or DISTRICT_NAMES[0]
 
     df = _daily()
     df = df[df["location"] == district].sort_values("date")
     if df.empty:
-        ui.empty_state("🛰️", "No stored data", "There is no stored NASA data for this district.")
+        ui.empty_state("No stored data", "There is no stored NASA data for this district.")
         return
     monthly = df.set_index("date").resample("MS").agg({"temperature_c": "mean", "rainfall_mm": "sum"}).reset_index()
 
-    cards = [
-        ("🌡️", "Mean temperature", f"{df['temperature_c'].mean():.1f} °C", "daily mean, 2024–2025"),
-        ("🌧️", "Total rainfall", f"{df['rainfall_mm'].sum():.0f} mm", "sum of daily values"),
-        ("🔥", "Warmest month", f"{monthly.loc[monthly['temperature_c'].idxmax(), 'date']:%b %Y}", f"{monthly['temperature_c'].max():.1f} °C avg"),
-        ("💧", "Wettest month", f"{monthly.loc[monthly['rainfall_mm'].idxmax(), 'date']:%b %Y}", f"{monthly['rainfall_mm'].max():.0f} mm"),
-    ]
-    ui.render(ui.grid([ui.stat(*c) for c in cards], four=True))
-    st.write("")
+    ui.render(ui.facts([
+        ("Average temperature", f"{df['temperature_c'].mean():.1f} °C", "daily mean, 2024–2025"),
+        ("Total rainfall", f"{df['rainfall_mm'].sum():.0f} mm", "sum of daily values"),
+        ("Warmest month", f"{monthly.loc[monthly['temperature_c'].idxmax(), 'date']:%b %Y}", f"{monthly['temperature_c'].max():.1f} °C average"),
+        ("Wettest month", f"{monthly.loc[monthly['rainfall_mm'].idxmax(), 'date']:%b %Y}", f"{monthly['rainfall_mm'].max():.0f} mm"),
+    ]))
 
-    t1, t2, t3 = st.tabs(["Trends", "Seasons", "Source"])
+    t1, t2, t3 = st.tabs(["Month by month", "By season", "About this data"])
     with t1:
         fig = go.Figure()
-        fig.add_bar(x=monthly["date"], y=monthly["rainfall_mm"], name="Rainfall (mm)", marker_color=ACCENT_2, opacity=.75)
+        fig.add_bar(x=monthly["date"], y=monthly["rainfall_mm"], name="Rainfall (mm)", marker_color=ACCENT_2, opacity=.8)
         fig.add_scatter(x=monthly["date"], y=monthly["temperature_c"], name="Temperature (°C)", yaxis="y2",
-                        line=dict(color=ACCENT, width=3, shape="spline"), mode="lines+markers")
-        fig.update_layout(**plot_layout(height=420, yaxis=dict(title="Rainfall (mm / month)")),
+                        line=dict(color=ACCENT_3, width=3, shape="spline"), mode="lines+markers")
+        fig.update_layout(**plot_layout(height=400, yaxis=dict(title="Rainfall (mm / month)")),
                           yaxis2=dict(title="Temperature (°C)", overlaying="y", side="right", showgrid=False))
         st.plotly_chart(fig, width="stretch")
     with t2:
@@ -492,7 +503,7 @@ def page_climate() -> None:
         for year, color in zip(sorted(seas["season_year"].unique()), [ACCENT, ACCENT_3, ACCENT_2]):
             part = seas[seas["season_year"] == year]
             fig.add_bar(x=part["season"].str.title(), y=part["rainfall_mm"], name=str(year), marker_color=color)
-        fig.update_layout(**plot_layout(height=360, barmode="group", yaxis=dict(title="Season rainfall (mm)")))
+        fig.update_layout(**plot_layout(height=340, barmode="group", yaxis=dict(title="Season rainfall (mm)")))
         st.plotly_chart(fig, width="stretch")
         st.dataframe(
             seas[["season", "season_year", "days_available", "complete", "temperature_c", "rainfall_mm"]],
@@ -500,12 +511,15 @@ def page_climate() -> None:
         )
         st.caption("Incomplete seasons are not used for recommendations.")
     with t3:
+        st.markdown(svc.DATA_NATURE)
         meta = svc.load_provenance(district)
         if meta:
-            c1, c2 = st.columns(2)
-            c1.markdown(ui.info_card("🛰️", "Source", f"{meta.get('source', 'NASA POWER')} daily point API (community AG, UTC)"), unsafe_allow_html=True)
-            c2.markdown(ui.info_card("📅", "Period", f"{meta.get('start_date', 'not recorded')} to {meta.get('end_date', 'not recorded')} · retrieved {meta.get('retrieved_at', 'not recorded')}"), unsafe_allow_html=True)
-            st.caption(f"Grid point: {meta.get('latitude')}, {meta.get('longitude')}")
+            st.markdown(
+                f"- **Source:** {meta.get('source', 'NASA POWER')} daily point data (community AG, UTC)\n"
+                f"- **Period:** {meta.get('start_date', 'not recorded')} to {meta.get('end_date', 'not recorded')}\n"
+                f"- **Retrieved:** {meta.get('retrieved_at', 'not recorded')}\n"
+                f"- **Grid point:** {meta.get('latitude')}, {meta.get('longitude')}"
+            )
         else:
             st.write("No provenance record found for this district.")
     _footer()
@@ -513,117 +527,108 @@ def page_climate() -> None:
 
 # ----------------------------------------------------------------- Map
 def page_map() -> None:
-    ui.render(ui.section("Geography", "Coverage map", "Blue markers are the five validated Karnataka districts; grey dots are the NASA grid across India."))
+    ui.render(ui.page_header("Where KAIRO has weather data", "Green markers are the five districts KAIRO was tested in. Grey dots are the NASA weather grid across India."))
     plan = st.session_state.plan
     profile = st.session_state.profile
     point = (profile["latitude"], profile["longitude"]) if profile and profile.get("latitude") is not None else None
-    show_grid = st.toggle("Show NASA grid coverage (all India)", value=True, key="show_grid")
-    with st.container(border=True):
-        st_folium(
-            build_map(
-                plan["district"] if plan and plan["district"] in DISTRICT_NAMES else None, point, _summary(),
-                grid_points=_grid_points() if show_grid else None, india_view=show_grid,
-            ),
-            height=520, use_container_width=True, returned_objects=[], key=f"district_map_{show_grid}",
-        )
-    st.write("")
+    show_grid = st.toggle("Show the NASA grid for all of India", value=True, key="show_grid")
+    st_folium(
+        build_map(
+            plan["district"] if plan and plan["district"] in DISTRICT_NAMES else None, point, _summary(),
+            grid_points=_grid_points() if show_grid else None, india_view=show_grid,
+        ),
+        height=500, use_container_width=True, returned_objects=[], key=f"district_map_{show_grid}",
+    )
     summary = _summary()
     summary = summary[summary["complete"] == True]  # noqa: E712
-    district_cards = []
+    cards = []
     for name in DISTRICT_NAMES:
         rows = summary[summary["location"] == name]
         lines = []
         for season in ("kharif", "rabi"):
             s = rows[rows["season"] == season]
             if not s.empty:
-                lines.append(f"{season.title()}: {s['temperature_c'].mean():.1f} °C · {s['rainfall_mm'].mean():.0f} mm")
+                lines.append(f"{season.title()}: {s['temperature_c'].mean():.1f} °C, {s['rainfall_mm'].mean():.0f} mm")
         selected = plan and plan["district"] == name
-        district_cards.append(ui.info_card("📍", name + (" ✓" if selected else ""), " | ".join(lines)))
-    ui.render(ui.grid(district_cards, 200))
-    ui.banner("Markers are district reference points, not farm boundaries. " + svc.DATA_NATURE, "info")
+        cards.append(f'<div class="panel"><h4>{escape(name)}{" (your field)" if selected else ""}</h4><p>{escape("  ·  ".join(lines))}</p></div>')
+    ui.render(ui.grid(cards, 200))
+    ui.note("Markers are district reference points, not field boundaries.")
     _footer()
 
 
-# ----------------------------------------------------------------- Sustainability
+# ----------------------------------------------------------------- Rotation health
 def page_sustainability() -> None:
-    ui.render(ui.section("Rotation health", "Sustainability indicators", "Structure-based indicators that compare options. They are not measured water, yield or soil results."))
     plan = _need_plan()
     if not plan:
         return
+    ui.render(ui.page_header("Rotation health", "How varied each option is across seasons and crop families."))
     if not plan["rotations"]:
-        ui.empty_state("🔍", "Nothing to evaluate", "No rotations were generated for this farm.")
+        ui.empty_state("Nothing to show", "No plan was generated for these answers.")
         return
-    tone = {"good": "green", "warning": "amber", "none": "gray", "moderate": "cyan", "info": "violet"}
     for rot, sus in zip(plan["rotations"], plan["sustainability"]):
         if not sus.get("available"):
             continue
-        with st.container(border=True):
-            c1, c2 = st.columns([1, 6], vertical_alignment="center")
-            c1.markdown(ui.ring(sus["indicator_score"], "indicator"), unsafe_allow_html=True)
-            rows = "".join(
-                f'<div style="margin:.35rem 0">{ui.tag(i["name"], tone.get(i["status"], "gray"))}'
-                f'<span style="color:#aab8cb;font-size:.9rem">{i["detail"]}</span></div>'
-                for i in sus["indicators"]
-            )
-            c2.markdown(f'<div class="kicker">Rotation #{rot["rank"]}</div><div style="font-weight:700;font-size:1.1rem;margin:.2rem 0 .4rem">{_rotation_label(rot)}</div>{rows}', unsafe_allow_html=True)
-    ui.banner(INDICATOR_NOTE, "info")
+        items = "".join(f"<li><b>{escape(i['name'])}:</b> {escape(i['detail'])}</li>" for i in sus["indicators"])
+        ui.render(
+            f'<div class="panel" style="margin-bottom:.9rem"><div class="eyebrow" style="color:#5F5A48">Option {rot["rank"]}</div>'
+            f'<h4 style="font-size:1.25rem;margin:.2rem 0">{escape(rotation_label(rot))}</h4>'
+            f'<p>Variety indicator: {sus["indicator_score"]} out of 100</p>'
+            f'<ul style="margin:.5rem 0 0 1.1rem;color:#2A2A22">{items}</ul></div>'
+        )
+    ui.note(INDICATOR_NOTE)
     _footer()
 
 
-# ----------------------------------------------------------------- Advisor
+# ----------------------------------------------------------------- Summary (advisor)
 def page_advisor() -> None:
-    ui.render(ui.section("Plain language", "KAIRO Advisor", "A readable summary of your plan. Built only from KAIRO's computed results."))
     plan = _need_plan()
     if not plan:
         return
-    left, right = st.columns([1.7, 1], gap="large")
-    with left:
-        st.markdown("##### Summary")
-        ui.render(f'<div class="bubble">{escape(advisor.template_explanation(plan))}</div>')
-        st.caption("Works offline. No data leaves your computer for this summary.")
-    with right:
-        with st.container(border=True):
-            st.markdown("##### :material/auto_awesome: Ask KAIRO AI")
-            if not advisor.ai_available():
-                ui.banner(
-                    "AI explanations are off. Add a free provider key (GROQ_API_KEY, GEMINI_API_KEY or "
-                    "OPENROUTER_API_KEY) to .env and restart KAIRO. The summary always works.",
-                    "info",
-                )
-            else:
-                language = st.segmented_control("Language", ["English", "Kannada", "Hindi"], default="English", key="ai_lang") or "English"
-                if st.button("Explain with AI", type="primary", key="ask_ai"):
-                    with st.spinner("Asking KAIRO AI…"):
-                        st.session_state["ai_result"] = advisor.ai_explanation(plan, language=language)
+    ui.render(ui.page_header("Plain-language summary", "Written from KAIRO's own results, so it only says what the numbers support."))
+    ui.render(f'<div class="bubble">{escape(advisor.template_explanation(plan))}</div>')
+    st.caption("This summary works offline and does not send your data anywhere.")
+
+    st.markdown("##### Ask for an AI explanation (optional)")
+    if not advisor.ai_available():
+        ui.note(
+            "AI explanations are off. Add a free provider key (GROQ_API_KEY, GEMINI_API_KEY or "
+            "OPENROUTER_API_KEY) to .env and restart KAIRO. The summary above always works."
+        )
+    else:
+        language = st.segmented_control("Language", ["English", "Kannada", "Hindi"], default="English", key="ai_lang") or "English"
+        if st.button("Explain with AI", type="primary", key="ask_ai"):
+            with st.spinner("Preparing the explanation…"):
+                st.session_state["ai_result"] = advisor.ai_explanation(plan, language=language)
     result = st.session_state.get("ai_result") if advisor.ai_available() else None
     if result:
         st.write("")
         if result["source"] == "ai":
-            ui.render(ui.tags([("AI-generated", "cyan"), (advisor.active_provider_label(), "gray"), ("numbers checked against KAIRO data", "green")]))
+            ui.note(f"AI-written ({advisor.active_provider_label()}). Numbers were checked against KAIRO's results.", "good")
         else:
-            ui.banner(f"Showing the standard summary instead. {result['fallback_reason']}")
+            ui.note(f"Showing the standard summary instead. {result['fallback_reason']}", "caution")
         ui.render(f'<div class="bubble">{escape(result["text"])}</div>')
     _footer()
 
 
 # ----------------------------------------------------------------- About
 def page_about() -> None:
-    ui.render(ui.section("About", "What KAIRO is", "Crop-rotation decision support built on NASA climate data: all of India by NASA grid cell, validated in five Karnataka districts."))
-    ui.render(ui.grid([
-        ui.info_card("🛰️", "Data", "NASA POWER daily point data (temperature, rainfall, humidity, solar) and a GPM IMERG rainfall sample."),
-        ui.info_card("🧮", "Method", "Rule-based suitability scoring against a sourced crop database, then rotation scoring with legume and family effects."),
-        ui.info_card("⚖️", "Honesty", "No yield, water-saving or soil-restoration claims. Unverified crop data is flagged wherever it appears."),
-    ], three=True))
-    st.write("")
-    ui.banner(svc.DATA_NATURE, "info")
-    st.markdown("##### Limitations")
+    ui.render(ui.page_header("About KAIRO", "Crop planning from NASA weather records, for farmers and local agronomists."))
     st.markdown(
-        "- Climate values are grid averages for district centres, not your field.\n"
-        "- Season windows (kharif Jun–Oct, rabi Nov–Mar, summer Apr–May) are assumptions.\n"
-        "- Scores use prototype weights; soil and water matching is simplified.\n"
-        "- Stored climate data covers 2024–2025."
+        "**What it does.** You describe a field; KAIRO compares the weather of past seasons at that place with what each "
+        "crop needs, then suggests a two-season plan and shows its reasoning.\n\n"
+        "**Where the weather comes from.** NASA POWER daily data on a grid about 56 km across, covering India. "
+        "It is modelled from satellites and reanalysis, so it describes the area, not your field.\n\n"
+        "**Where it was tested.** Crop information was checked in five Karnataka districts: Ballari, Shivamogga, "
+        "Vijayapura, Belagavi and Dharwad. Elsewhere, treat results as a starting point."
     )
-    ui.banner(svc.DISCLAIMER)
+    st.markdown("##### Limits")
+    st.markdown(
+        "- Season windows (kharif Jun–Oct, rabi Nov–Mar, summer Apr–May) are assumptions.\n"
+        "- The crop list is short (six crops) and some figures are still being verified.\n"
+        "- Scores use prototype weights; soil and water matching is simplified.\n"
+        "- KAIRO makes no yield, water-saving or soil-restoration claims."
+    )
+    ui.note(CHECK_LOCALLY, "good")
     _footer()
 
 

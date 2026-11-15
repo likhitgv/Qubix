@@ -58,17 +58,11 @@ def build_map(
         tiles="OpenStreetMap",  # free, no API key
         control_scale=True,
     )
-    # Dark look without a paid basemap: invert the tile layer only.
+    # Calm light map: soften the standard tiles slightly so markers stand out.
     fmap.get_root().header.add_child(folium.Element(
-        "<style>.leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) "
-        "brightness(.85) contrast(.9) saturate(.7);}"
-        ".leaflet-control-attribution{background:rgba(6,10,17,.72)!important;color:#8b9ab0!important;font-size:10px!important;}"
-        ".leaflet-control-attribution a{color:#67e8f9!important;}"
-        ".leaflet-bar a{background:#0f1726!important;color:#e6edf6!important;border-color:rgba(148,163,184,.25)!important;}"
-        ".leaflet-bar a:hover{background:#16233a!important;}"
-        ".leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#0f1726;color:#e6edf6;}"
-        ".leaflet-control-scale-line{background:rgba(6,10,17,.6)!important;color:#8b9ab0!important;"
-        "border-color:#5f6f86!important;}</style>"
+        "<style>.leaflet-tile-pane{filter:saturate(.7) sepia(.12) brightness(1.02);}"
+        ".leaflet-control-attribution{font-size:10px!important;}"
+        ".leaflet-popup-content-wrapper{border-radius:8px;}</style>"
     ))
 
     if grid_points is not None and not grid_points.empty:
@@ -76,7 +70,7 @@ def build_map(
         for row in grid_points.itertuples():
             folium.CircleMarker(
                 location=(row.latitude, row.longitude), radius=2, weight=0, fill=True,
-                fill_color="#64748b", fill_opacity=0.55, tooltip=f"NASA grid point {row.grid_id}",
+                fill_color="#7A7461", fill_opacity=0.6, tooltip=f"NASA weather area {row.grid_id}",
             ).add_to(layer)
         layer.add_to(fmap)
 
@@ -85,7 +79,7 @@ def build_map(
         folium.CircleMarker(
             location=(d["latitude"], d["longitude"]),
             radius=11 if is_selected else 7,
-            color="#34d399" if is_selected else "#22d3ee",
+            color="#A4673A" if is_selected else "#1F4D2B",
             weight=3 if is_selected else 2,
             fill=True,
             fill_opacity=0.55,
@@ -95,16 +89,16 @@ def build_map(
 
     if grid_link is not None:
         folium.CircleMarker(
-            location=grid_link, radius=9, color="#fbbf24", weight=2, fill=False,
-            tooltip="NASA grid cell used for this farm",
+            location=grid_link, radius=9, color="#D4910F", weight=3, fill=False,
+            tooltip="NASA weather area used for this field",
         ).add_to(fmap)
         if farm_point is not None:
-            folium.PolyLine([farm_point, grid_link], color="#fbbf24", weight=2, dash_array="6", opacity=0.8).add_to(fmap)
+            folium.PolyLine([farm_point, grid_link], color="#D4910F", weight=2, dash_array="6", opacity=0.9).add_to(fmap)
 
     if farm_point is not None:
         folium.Marker(
             location=farm_point,
-            tooltip="Your farm",
+            tooltip="Your field",
             icon=folium.Icon(color="green", icon="leaf", prefix="fa"),
         ).add_to(fmap)
         if selected_district:
@@ -112,7 +106,7 @@ def build_map(
             if d:
                 folium.PolyLine(
                     [farm_point, (d["latitude"], d["longitude"])],
-                    color="#fbbf24", weight=2, dash_array="6", opacity=0.8,
+                    color="#D4910F", weight=2, dash_array="6", opacity=0.9,
                 ).add_to(fmap)
 
     return fmap
