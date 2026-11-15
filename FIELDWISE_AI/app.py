@@ -11,6 +11,7 @@ from datetime import date
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+from dotenv import load_dotenv
 
 from config.districts import DISTRICTS
 from config.soils import (
@@ -26,6 +27,8 @@ from dashboard.theme import PLOT_LAYOUT, banner, inject_theme, metric_card, pill
 from modules import advisor
 from modules import kyro_service as svc
 from modules.crop_database import load_crop_database
+
+load_dotenv()  # reads .env (AI provider keys) if present
 
 st.set_page_config(page_title="Kyro", page_icon="🌱", layout="wide")
 inject_theme()
@@ -370,8 +373,8 @@ def page_advisor() -> None:
     st.markdown("#### Ask Kyro AI")
     if not advisor.ai_available():
         banner(
-            "AI explanations are off. Set the ANTHROPIC_API_KEY environment variable "
-            "and restart Kyro to enable them. The summary above always works.",
+            "AI explanations are off. Add a free provider key (GROQ_API_KEY, GEMINI_API_KEY or "
+            "OPENROUTER_API_KEY) to .env and restart Kyro. The summary above always works.",
             info=True,
         )
         return
@@ -383,7 +386,7 @@ def page_advisor() -> None:
     result = st.session_state.get("ai_result")
     if result:
         if result["source"] == "ai":
-            st.markdown(pill("AI-generated", "blue") + "checked against Kyro's computed numbers", unsafe_allow_html=True)
+            st.markdown(pill("AI-generated", "blue") + f"via {advisor.active_provider_label()}, checked against Kyro's computed numbers", unsafe_allow_html=True)
         else:
             banner(f"Showing the standard summary instead. {result['fallback_reason']}")
         st.write(result["text"])

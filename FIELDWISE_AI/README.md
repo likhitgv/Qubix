@@ -22,7 +22,7 @@ py -3.11 -m streamlit run app.py
 py -3.11 -m unittest discover -s tests -t .
 ```
 
-Optional AI explanations: set the `ANTHROPIC_API_KEY` environment variable (never
+Optional AI explanations: copy `.env.example` to `.env` and add a free Groq, Gemini or OpenRouter key (never
 commit it). Without it the Advisor page uses an offline template summary.
 
 ## Structure
@@ -48,7 +48,7 @@ FIELDWISE_AI/            (folder name kept so existing clones keep working)
 - Groundnut, chickpea and maize rows are flagged NEEDS VERIFICATION (secondary sources).
 - `soil_database.csv` is empty; soil matching uses the crop database's soil lists.
 - Sustainability output is a structural indicator, not water, yield or soil measurement.
-- The AI path is tested with a fake client only; it needs a real key to try live.
+- The AI path is tested with a fake HTTP client only; it needs a free provider key to try live.
 
 ## NASA data collection (Module M2)
 

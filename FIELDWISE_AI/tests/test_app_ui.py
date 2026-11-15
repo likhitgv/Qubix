@@ -85,8 +85,8 @@ class AppUITests(unittest.TestCase):
     def test_advisor_without_key_shows_template_and_off_notice(self):
         import os
         from unittest import mock
-        env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
-        with mock.patch.dict(os.environ, env, clear=True):
+        env = {k: v for k, v in os.environ.items() if not k.endswith("_API_KEY")}
+        with mock.patch.dict(os.environ, env, clear=True), mock.patch("dotenv.load_dotenv"):
             at = fresh()
             at.session_state["page"] = "Farm"
             at.run()

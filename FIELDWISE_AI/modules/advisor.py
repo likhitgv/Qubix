@@ -3,11 +3,13 @@
 Two layers:
   1. ``template_explanation`` - deterministic text built only from the plan.
      Always available, works offline.
-  2. ``ai_explanation`` - optional Claude explanation. It receives only the
+  2. ``ai_explanation`` - optional LLM explanation. It receives only the
      facts the modules computed, and its reply is rejected (falling back to the
      template) if it contains numbers that are not in those facts.
 
-The API key is read from the ANTHROPIC_API_KEY environment variable only.
+Any OpenAI-compatible chat API works. Free options are preconfigured: Groq,
+Google Gemini and OpenRouter. Choose one with KYRO_AI_PROVIDER and set that
+provider's key in the environment (see .env.example). Keys are never logged.
 """
 
 from __future__ import annotations
@@ -17,7 +19,29 @@ import os
 import re
 from typing import Any, Callable, Optional
 
-DEFAULT_MODEL = "claude-sonnet-5-5"
+import requests
+
+# Preset free-tier providers (OpenAI-compatible /chat/completions). Free-tier
+# model names change over time: override with KYRO_MODEL if a default is retired.
+PROVIDERS = {
+    "groq": {
+        "base_url": "https://api.groq.com/openai/v1",
+        "model": "llama-3.3-70b-versatile",
+        "key_env": "GROQ_API_KEY",
+    },
+    "gemini": {
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "model": "gemini-2.0-flash",
+        "key_env": "GEMINI_API_KEY",
+    },
+    "openrouter": {
+        "base_url": "https://openrouter.ai/api/v1",
+        "model": "meta-llama/llama-3.3-70b-instruct:free",
+        "key_env": "OPENROUTER_API_KEY",
+    },
+}
+DEFAULT_PROVIDER = "groq"
+REQUEST_TIMEOUT_S = 30
 
 SYSTEM_PROMPT = (
     "You are Kyro, a careful farm-advisory explainer. You are given FACTS computed "
@@ -103,14 +127,30 @@ def template_explanation(plan: dict[str, Any]) -> str:
     return " ".join(lines)
 
 
+def provider_config() -> Optional[dict[str, str]]:
+    """Resolve the active provider's settings, or None if unknown/no key."""
+    name = os.environ.get("KYRO_AI_PROVIDER", DEFAULT_PROVIDER).strip().lower()
+    preset = PROVIDERS.get(name)
+    if preset is None:
+        return None
+    key = os.environ.get(preset["key_env"], "").strip()
+    if not key:
+        return None
+    return {
+        "provider": name,
+        "api_key": key,
+        "base_url": os.environ.get("KYRO_AI_BASE_URL", preset["base_url"]).rstrip("/"),
+        "model": os.environ.get("KYRO_MODEL", preset["model"]),
+    }
+
+
 def ai_available() -> bool:
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        return False
-    try:
-        import anthropic  # noqa: F401
-    except ImportError:
-        return False
-    return True
+    return provider_config() is not None
+
+
+def active_provider_label() -> str:
+    name = os.environ.get("KYRO_AI_PROVIDER", DEFAULT_PROVIDER).strip().lower()
+    return name if name in PROVIDERS else f"{name} (unknown)"
 
 
 _NUM = re.compile(r"\d+(?:\.\d+)?")
@@ -127,36 +167,43 @@ def numbers_are_grounded(text: str, facts: dict[str, Any]) -> bool:
 def ai_explanation(
     plan: dict[str, Any],
     language: str = "English",
-    client_factory: Optional[Callable[[], Any]] = None,
-    model: Optional[str] = None,
+    post: Optional[Callable[..., Any]] = None,
+    config: Optional[dict[str, str]] = None,
 ) -> dict[str, Any]:
-    """Ask Claude to explain the plan. Always returns a usable result.
+    """Ask the configured LLM to explain the plan. Always returns a usable result.
 
-    Returns {"text", "source"} where source is "ai" or "template", plus
-    "fallback_reason" when the template was used.
+    Returns {"text", "source", "fallback_reason"}; source is "ai" or "template".
+    ``post`` and ``config`` exist so tests can run without network or keys.
     """
     fallback = template_explanation(plan)
-    if client_factory is None and not ai_available():
+    cfg = config or provider_config()
+    if cfg is None:
         return {"text": fallback, "source": "template",
-                "fallback_reason": "No ANTHROPIC_API_KEY configured."}
+                "fallback_reason": "No AI provider key configured."}
+
     facts = build_facts(plan)
+    sender = post or requests.post
     try:
-        if client_factory is None:
-            import anthropic
-            client = anthropic.Anthropic()
-        else:
-            client = client_factory()
-        reply = client.messages.create(
-            model=model or os.environ.get("KYRO_MODEL", DEFAULT_MODEL),
-            max_tokens=600,
-            system=SYSTEM_PROMPT,
-            messages=[{
-                "role": "user",
-                "content": f"Reply in {language}.\nFACTS:\n{json.dumps(facts, indent=2)}",
-            }],
+        response = sender(
+            f"{cfg['base_url']}/chat/completions",
+            headers={"Authorization": f"Bearer {cfg['api_key']}",
+                     "Content-Type": "application/json"},
+            json={
+                "model": cfg["model"],
+                "max_tokens": 600,
+                "temperature": 0.2,
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user",
+                     "content": f"Reply in {language}.\nFACTS:\n{json.dumps(facts, indent=2)}"},
+                ],
+            },
+            timeout=REQUEST_TIMEOUT_S,
         )
-        text = "".join(b.text for b in reply.content if getattr(b, "type", "") == "text").strip()
-    except Exception as error:  # network, auth, rate limit, SDK errors
+        response.raise_for_status()
+        text = (response.json()["choices"][0]["message"]["content"] or "").strip()
+    except Exception as error:  # network, auth, rate limit, bad payload
+        # Report only the error type: messages can echo request details.
         return {"text": fallback, "source": "template",
                 "fallback_reason": f"AI request failed ({type(error).__name__})."}
 

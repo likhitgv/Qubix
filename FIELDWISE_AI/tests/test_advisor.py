@@ -13,12 +13,24 @@ def _plan():
     return build_plan({"district": "Dharwad", "soil_type": "sandy-loam", "water_availability": "rainfed"})
 
 
-def _client(text=None, error=None):
-    def create(**kwargs):
+CFG = {"provider": "groq", "api_key": "sk-test-secret",
+       "base_url": "https://example.test/v1", "model": "m"}
+
+
+def _post(text=None, error=None, status_error=None):
+    def post(url, headers=None, json=None, timeout=None):
         if error:
             raise error
-        return SimpleNamespace(content=[SimpleNamespace(type="text", text=text)])
-    return lambda: SimpleNamespace(messages=SimpleNamespace(create=create))
+
+        def raise_for_status():
+            if status_error:
+                raise status_error
+
+        return SimpleNamespace(
+            raise_for_status=raise_for_status,
+            json=lambda: {"choices": [{"message": {"content": text}}]},
+        )
+    return post
 
 
 class TemplateTests(unittest.TestCase):
@@ -48,33 +60,79 @@ class GroundingTests(unittest.TestCase):
 
 class AiExplanationTests(unittest.TestCase):
     def test_no_key_uses_template(self):
-        with mock.patch.dict(os.environ, {}, clear=True):
+        env = {k: v for k, v in os.environ.items() if not k.endswith("_API_KEY")}
+        with mock.patch.dict(os.environ, env, clear=True):
             r = advisor.ai_explanation(_plan())
         self.assertEqual(r["source"], "template")
-        self.assertIn("ANTHROPIC_API_KEY", r["fallback_reason"])
+        self.assertIn("No AI provider key", r["fallback_reason"])
 
     def test_good_reply_used(self):
-        r = advisor.ai_explanation(_plan(), client_factory=_client("Dharwad suits these crops. Check with an agronomist."))
+        r = advisor.ai_explanation(_plan(), post=_post("Dharwad suits these crops."), config=CFG)
         self.assertEqual(r["source"], "ai")
 
     def test_hallucinated_numbers_fall_back(self):
-        r = advisor.ai_explanation(_plan(), client_factory=_client("This raises yield by 41 percent."))
+        r = advisor.ai_explanation(_plan(), post=_post("This raises yield by 41 percent."), config=CFG)
         self.assertEqual(r["source"], "template")
         self.assertIn("figures", r["fallback_reason"])
 
-    def test_api_error_falls_back(self):
-        r = advisor.ai_explanation(_plan(), client_factory=_client(error=RuntimeError("boom")))
+    def test_network_error_falls_back(self):
+        r = advisor.ai_explanation(_plan(), post=_post(error=ConnectionError("boom")), config=CFG)
         self.assertEqual(r["source"], "template")
-        self.assertIn("RuntimeError", r["fallback_reason"])
+        self.assertIn("ConnectionError", r["fallback_reason"])
+
+    def test_http_error_falls_back(self):
+        r = advisor.ai_explanation(_plan(), post=_post("x", status_error=RuntimeError("429")), config=CFG)
+        self.assertEqual(r["source"], "template")
 
     def test_empty_reply_falls_back(self):
-        r = advisor.ai_explanation(_plan(), client_factory=_client(""))
+        r = advisor.ai_explanation(_plan(), post=_post(""), config=CFG)
         self.assertEqual(r["source"], "template")
 
     def test_key_never_in_output(self):
-        with mock.patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test-secret"}):
-            r = advisor.ai_explanation(_plan(), client_factory=_client(error=RuntimeError("x")))
+        r = advisor.ai_explanation(_plan(), post=_post(error=RuntimeError("sk-test-secret leaked")), config=CFG)
         self.assertNotIn("sk-test-secret", str(r))
+
+    def test_request_uses_bearer_and_chat_endpoint(self):
+        seen = {}
+
+        def post(url, headers=None, json=None, timeout=None):
+            seen.update(url=url, headers=headers, body=json)
+            return _post("ok")(url)
+
+        advisor.ai_explanation(_plan(), post=post, config=CFG)
+        self.assertEqual(seen["url"], "https://example.test/v1/chat/completions")
+        self.assertEqual(seen["headers"]["Authorization"], "Bearer sk-test-secret")
+        self.assertEqual(seen["body"]["messages"][0]["role"], "system")
+
+
+class ProviderConfigTests(unittest.TestCase):
+    def _env(self, **extra):
+        base = {k: v for k, v in os.environ.items()
+                if not k.endswith("_API_KEY") and not k.startswith("KYRO_")}
+        base.update(extra)
+        return mock.patch.dict(os.environ, base, clear=True)
+
+    def test_default_provider_groq(self):
+        with self._env(GROQ_API_KEY="k"):
+            cfg = advisor.provider_config()
+        self.assertEqual(cfg["provider"], "groq")
+        self.assertIn("groq.com", cfg["base_url"])
+
+    def test_switch_to_gemini(self):
+        with self._env(KYRO_AI_PROVIDER="gemini", GEMINI_API_KEY="k"):
+            self.assertEqual(advisor.provider_config()["provider"], "gemini")
+
+    def test_wrong_key_for_provider_is_unavailable(self):
+        with self._env(KYRO_AI_PROVIDER="gemini", GROQ_API_KEY="k"):
+            self.assertFalse(advisor.ai_available())
+
+    def test_unknown_provider_unavailable(self):
+        with self._env(KYRO_AI_PROVIDER="nope", GROQ_API_KEY="k"):
+            self.assertFalse(advisor.ai_available())
+
+    def test_model_override(self):
+        with self._env(GROQ_API_KEY="k", KYRO_MODEL="custom-model"):
+            self.assertEqual(advisor.provider_config()["model"], "custom-model")
 
 
 if __name__ == "__main__":
