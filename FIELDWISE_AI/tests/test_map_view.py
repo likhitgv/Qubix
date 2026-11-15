@@ -35,6 +35,20 @@ class MapTests(unittest.TestCase):
         self.assertIn("openstreetmap.org", html)
         self.assertNotIn("basemaps.cartocdn", html)
 
+    def test_grid_layer_draws_every_point(self):
+        pts = pd.DataFrame({"grid_id": ["1.000,2.000", "3.000,4.000"], "latitude": [1.0, 3.0], "longitude": [2.0, 4.0]})
+        html = build_map(grid_points=pts, india_view=True).get_root().render()
+        self.assertIn("NASA grid point 1.000,2.000", html)
+        self.assertIn("NASA grid point 3.000,4.000", html)
+
+    def test_grid_link_draws_ring_and_line(self):
+        html = build_map(farm_point=(26.9, 75.8), grid_link=(27.0, 75.6)).get_root().render()
+        self.assertIn("NASA grid cell used for this farm", html)
+
+    def test_india_view_centres_on_india(self):
+        html = build_map(india_view=True).get_root().render()
+        self.assertIn("22.5", html)
+
 
 if __name__ == "__main__":
     unittest.main()

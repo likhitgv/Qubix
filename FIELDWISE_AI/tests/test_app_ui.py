@@ -120,14 +120,34 @@ class GeotagTests(unittest.TestCase):
         widget(at.segmented_control, "Method").set_value("Pin on map")
         at.run()
 
-    def test_coordinates_outside_coverage_warn(self):
+    def test_pin_outside_india_is_rejected(self):
         at = fresh()
         self._pin_mode(at)
-        widget(at.number_input, "Latitude").set_value(28.6)
-        widget(at.number_input, "Longitude").set_value(77.2)
+        widget(at.number_input, "Latitude").set_value(15.0)
+        widget(at.number_input, "Longitude").set_value(66.0)  # Arabian Sea
         at.run()
         self.assertFalse(at.exception, at.exception)
-        self.assertIn("only has data", page_text(at))
+        self.assertIn("outside the downloaded area", page_text(at))
+        widget(at.button, "Generate recommendations").click()
+        at.run()
+        self.assertIsNone(at.session_state["plan"])
+
+    def test_pin_in_another_state_works_with_karnataka_caution(self):
+        at = fresh()
+        self._pin_mode(at)
+        widget(at.number_input, "Latitude").set_value(26.91)
+        widget(at.number_input, "Longitude").set_value(75.79)  # Jaipur
+        at.run()
+        text = page_text(at)
+        self.assertIn("NASA grid cell", text)
+        self.assertIn("outside the five Karnataka districts", text)
+        widget(at.button, "Generate recommendations").click()
+        at.run()
+        self.assertFalse(at.exception, at.exception)
+        plan = at.session_state["plan"]
+        self.assertIsNotNone(plan["grid_id"])
+        self.assertTrue(plan["rotations"])
+        self.assertTrue(any("outside the five Karnataka" in w for w in plan["warnings"]))
 
     def test_map_click_sets_coordinates_and_nearest_district(self):
         at = fresh()

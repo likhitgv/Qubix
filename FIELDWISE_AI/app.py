@@ -6,6 +6,7 @@ UI only: all data handling and scoring lives in modules/.
 
 from __future__ import annotations
 
+import re
 from datetime import date
 from html import escape
 
@@ -67,6 +68,36 @@ def _summary() -> pd.DataFrame:
     return svc.load_seasonal_summary()
 
 
+@st.cache_data(show_spinner=False)
+def _grid_points() -> pd.DataFrame:
+    return svc.load_grid_points()
+
+
+@st.cache_data(show_spinner=False)
+def _grid_summary() -> pd.DataFrame:
+    return svc.load_grid_summary()
+
+
+def _district_grid_id(name: str | None) -> str | None:
+    """NASA grid cell for a validated district, so district and pin results agree.
+
+    Both read the same NASA grid; the multi-year record averages more seasons.
+    Returns None (falling back to the district file) if the grid files are missing
+    or the name is not one of the five districts.
+    """
+    district = next((d for d in DISTRICTS if d["name"] == name), None)
+    if district is None:
+        return None
+    try:
+        return svc.nearest_grid_point(district["latitude"], district["longitude"], _grid_points())["grid_id"]
+    except FileNotFoundError:
+        return None
+
+
+def _slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-") or "farm"
+
+
 def _goto(page: str) -> None:
     st.session_state["_nav"] = page
 
@@ -121,8 +152,8 @@ def page_home() -> None:
 
     n_crops = len(load_crop_database())
     stats = [
-        ("📍", "Districts", "5", "Ballari · Shivamogga · Vijayapura · Belagavi · Dharwad"),
-        ("🛰️", "NASA POWER", "2024–25", "Daily temperature, rain, humidity, sunshine"),
+        ("📍", "Coverage", "All India", "882 NASA grid points · 5 Karnataka districts validated"),
+        ("🛰️", "NASA POWER", "2021–2026", "Daily temperature, rain and humidity per grid cell"),
         ("🌾", "Crops", str(n_crops), "Sourced; unverified rows are flagged"),
         ("🔁", "Seasons", "Kharif + Rabi", "Rotation scored across both"),
     ]
@@ -175,17 +206,26 @@ def page_farm() -> None:
                 c1, c2 = st.columns(2)
                 lat = c1.number_input("Latitude", -90.0, 90.0, format="%.4f", key="farm_lat")
                 lon = c2.number_input("Longitude", -180.0, 180.0, format="%.4f", key="farm_lon")
-                geo = svc.nearest_district(lat, lon)
+                geo = svc.nearest_grid_point(lat, lon, _grid_points())
+                near = svc.nearest_district(lat, lon)
                 if geo["within_coverage"]:
                     ui.banner(
-                        f"Nearest supported district: <b>{geo['district']}</b> ({geo['distance_km']} km away). {geo['note']}",
+                        f"NASA grid cell <b>{geo['grid_id']}</b> is {geo['distance_km']} km from your pin. {geo['note']}",
                         "ok",
                     )
-                    district = geo["district"]
+                    if near["within_coverage"]:
+                        district = near["district"]
+                        ui.banner(
+                            f"Closest validated district: <b>{near['district']}</b> ({near['distance_km']} km away).",
+                            "info",
+                        )
+                    else:
+                        district = f"Pin {lat:.2f}°N, {lon:.2f}°E"
+                        ui.banner(svc.OUTSIDE_KARNATAKA_NOTE)
                 else:
                     ui.banner(
-                        f"This point is {geo['distance_km']} km from the nearest supported district "
-                        f"({geo['district']}). KAIRO only has data for five Karnataka districts.",
+                        f"This point is {geo['distance_km']} km from the nearest NASA grid cell, so it is outside "
+                        "the downloaded area (India). Move the pin onto the map of India."
                     )
 
         with st.container(border=True):
@@ -211,7 +251,12 @@ def page_farm() -> None:
             else:
                 st.markdown("##### :material/touch_app: Click the map to place your farm")
                 clicked = st_folium(
-                    build_map(geo["district"] if geo and geo["within_coverage"] else None, (lat, lon), _summary()),
+                    build_map(
+                        district if geo and geo["within_coverage"] and district in DISTRICT_NAMES else None,
+                        (lat, lon), _summary(), grid_points=_grid_points(),
+                        grid_link=(geo["latitude"], geo["longitude"]) if geo and geo["within_coverage"] else None,
+                        india_view=True,
+                    ),
                     height=430, use_container_width=True, returned_objects=["last_clicked"], key="farm_map_pin",
                 )
                 last = (clicked or {}).get("last_clicked")
@@ -222,7 +267,7 @@ def page_farm() -> None:
     st.write("")
     if st.button("Generate recommendations", type="primary", key="generate"):
         if district is None:
-            st.error("Choose a district, or drop a pin inside the supported area.")
+            st.error("Choose a district, or drop a pin inside India.")
             return
         soil_label = soil_label or "Not sure"
         water_label = water_label or "Rainfed"
@@ -236,9 +281,10 @@ def page_farm() -> None:
             "previous_crops": ", ".join(previous) if previous else None,
             "latitude": lat,
             "longitude": lon,
+            "grid_id": geo["grid_id"] if geo and geo["within_coverage"] else _district_grid_id(district),
         }
         try:
-            plan = svc.build_plan(profile, _summary())
+            plan = svc.build_plan(profile, _grid_summary() if profile["grid_id"] else _summary())
         except (ValueError, FileNotFoundError) as error:
             st.error(f"Could not build a plan: {error}")
             return
@@ -338,8 +384,10 @@ def page_recommendations() -> None:
     ]
     icons = {"kharif": "🌧️", "rabi": "🌤️", "summer": "☀️"}
     for season, env in cond.items():
+        years = env.get("season_years_used") or []
+        basis = f"avg of {len(years)} seasons ({min(years)}–{max(years)})" if years else "NASA POWER avg"
         kpis.append(ui.stat(icons.get(season, "🌱"), f"{season.title()} climate", f"{env['temperature_c']:.1f} °C",
-                            f"{env['rainfall_mm']:.0f} mm rain · NASA POWER avg"))
+                            f"{env['rainfall_mm']:.0f} mm rain · {basis}"))
     ui.render(ui.grid(kpis, 230))
 
     if not plan["rotations"]:
@@ -353,7 +401,7 @@ def page_recommendations() -> None:
         st.download_button(
             "Download recommendations (CSV)",
             _plan_csv(plan).to_csv(index=False).encode("utf-8"),
-            file_name=f"kairo_{plan['district'].lower()}_{date.today().isoformat()}.csv",
+            file_name=f"kairo_{_slug(plan['district'])}_{date.today().isoformat()}.csv",
             mime="text/csv",
         )
     with tab_compare:
@@ -440,14 +488,18 @@ def page_climate() -> None:
 
 # ----------------------------------------------------------------- Map
 def page_map() -> None:
-    ui.render(ui.section("Geography", "District map", "Click a marker for the latest complete NASA POWER seasonal averages."))
+    ui.render(ui.section("Geography", "Coverage map", "Blue markers are the five validated Karnataka districts; grey dots are the NASA grid across India."))
     plan = st.session_state.plan
     profile = st.session_state.profile
     point = (profile["latitude"], profile["longitude"]) if profile and profile.get("latitude") is not None else None
+    show_grid = st.toggle("Show NASA grid coverage (all India)", value=True, key="show_grid")
     with st.container(border=True):
         st_folium(
-            build_map(plan["district"] if plan else None, point, _summary()),
-            height=520, use_container_width=True, returned_objects=[], key="district_map",
+            build_map(
+                plan["district"] if plan and plan["district"] in DISTRICT_NAMES else None, point, _summary(),
+                grid_points=_grid_points() if show_grid else None, india_view=show_grid,
+            ),
+            height=520, use_container_width=True, returned_objects=[], key=f"district_map_{show_grid}",
         )
     st.write("")
     summary = _summary()
@@ -531,7 +583,7 @@ def page_advisor() -> None:
 
 # ----------------------------------------------------------------- About
 def page_about() -> None:
-    ui.render(ui.section("About", "What KAIRO is", "Crop-rotation decision support for five Karnataka districts, built on NASA climate data."))
+    ui.render(ui.section("About", "What KAIRO is", "Crop-rotation decision support built on NASA climate data: all of India by NASA grid cell, validated in five Karnataka districts."))
     ui.render(ui.grid([
         ui.info_card("🛰️", "Data", "NASA POWER daily point data (temperature, rainfall, humidity, solar) and a GPM IMERG rainfall sample."),
         ui.info_card("🧮", "Method", "Rule-based suitability scoring against a sourced crop database, then rotation scoring with legume and family effects."),

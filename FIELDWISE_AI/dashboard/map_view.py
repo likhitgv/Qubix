@@ -10,6 +10,7 @@ import pandas as pd
 from config.districts import DISTRICTS
 
 KARNATAKA_CENTER = (15.0, 75.7)
+INDIA_CENTER = (22.5, 79.0)
 
 
 def _district_popup(district: dict, summary: Optional[pd.DataFrame]) -> str:
@@ -38,11 +39,20 @@ def build_map(
     selected_district: Optional[str] = None,
     farm_point: Optional[tuple[float, float]] = None,
     summary: Optional[pd.DataFrame] = None,
+    grid_points: Optional[pd.DataFrame] = None,
+    grid_link: Optional[tuple[float, float]] = None,
+    india_view: bool = False,
 ) -> folium.Map:
-    """Build a Folium map. Pure function: no Streamlit calls, easy to test."""
+    """Build a Folium map. Pure function: no Streamlit calls, easy to test.
+
+    grid_points: optional DataFrame (grid_id, latitude, longitude) drawn as small dots
+    showing the downloaded all-India NASA coverage. grid_link: the NASA grid cell used
+    for the farm point; drawn as a ring with a line from the farm. india_view zooms out
+    to the whole country.
+    """
     fmap = folium.Map(
-        location=KARNATAKA_CENTER,
-        zoom_start=7,
+        location=INDIA_CENTER if india_view else KARNATAKA_CENTER,
+        zoom_start=5 if india_view else 7,
         tiles="OpenStreetMap",  # free, no API key
         control_scale=True,
     )
@@ -59,6 +69,15 @@ def build_map(
         "border-color:#5f6f86!important;}</style>"
     ))
 
+    if grid_points is not None and not grid_points.empty:
+        layer = folium.FeatureGroup(name="NASA grid coverage", show=True)
+        for row in grid_points.itertuples():
+            folium.CircleMarker(
+                location=(row.latitude, row.longitude), radius=2, weight=0, fill=True,
+                fill_color="#64748b", fill_opacity=0.55, tooltip=f"NASA grid point {row.grid_id}",
+            ).add_to(layer)
+        layer.add_to(fmap)
+
     for d in DISTRICTS:
         is_selected = d["name"] == selected_district
         folium.CircleMarker(
@@ -71,6 +90,14 @@ def build_map(
             tooltip=d["name"],
             popup=folium.Popup(_district_popup(d, summary), max_width=260),
         ).add_to(fmap)
+
+    if grid_link is not None:
+        folium.CircleMarker(
+            location=grid_link, radius=9, color="#fbbf24", weight=2, fill=False,
+            tooltip="NASA grid cell used for this farm",
+        ).add_to(fmap)
+        if farm_point is not None:
+            folium.PolyLine([farm_point, grid_link], color="#fbbf24", weight=2, dash_array="6", opacity=0.8).add_to(fmap)
 
     if farm_point is not None:
         folium.Marker(
