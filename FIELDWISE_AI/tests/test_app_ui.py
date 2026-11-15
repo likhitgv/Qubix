@@ -1,101 +1,167 @@
-"""Headless UI tests using Streamlit AppTest."""
+"""Headless UI tests using Streamlit AppTest (new KAIRO pill/segmented UI)."""
 
+import os
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from streamlit.testing.v1 import AppTest
 
 APP = str(Path(__file__).resolve().parents[1] / "app.py")
+PAGES = ["Home", "Farm", "Recommendations", "Climate", "Map", "Sustainability", "Advisor", "About"]
 
 
 def fresh():
-    at = AppTest.from_file(APP, default_timeout=60)
+    at = AppTest.from_file(APP, default_timeout=90)
     at.run()
     return at
 
 
-class AppUITests(unittest.TestCase):
-    def test_home_renders_without_exception(self):
+def go(at, page):
+    at.session_state["page"] = page
+    at.run()
+
+
+def widget(collection, label):
+    return [w for w in collection if w.label == label][0]
+
+
+def generate(at, soil="Sandy loam"):
+    go(at, "Farm")
+    widget(at.pills, "Soil type").set_value(soil)
+    at.run()
+    widget(at.button, "Generate recommendations").click()
+    at.run()
+
+
+def page_text(at):
+    return " ".join(str(m.value) for m in at.markdown)
+
+
+class NavigationTests(unittest.TestCase):
+    def test_home_renders(self):
         at = fresh()
         self.assertFalse(at.exception, at.exception)
+        self.assertIn("evidence", page_text(at))
 
-    def test_every_page_renders(self):
+    def test_every_page_renders_without_a_farm(self):
         at = fresh()
-        for page in ["Home", "Farm", "Recommendations", "Climate", "Map", "Sustainability", "Advisor", "About"]:
-            at.session_state["page"] = page
-            at.run()
+        for page in PAGES:
+            go(at, page)
             self.assertFalse(at.exception, f"{page}: {at.exception}")
 
-    def test_empty_state_prompts_for_farm(self):
+    def test_pages_needing_a_farm_show_empty_state(self):
         at = fresh()
-        at.session_state["page"] = "Recommendations"
-        at.run()
-        self.assertTrue(any("Save your farm" in i.value for i in at.info))
+        for page in ["Recommendations", "Sustainability", "Advisor"]:
+            go(at, page)
+            self.assertIn("No farm saved yet", page_text(at), page)
 
-    def test_full_flow_generates_recommendations(self):
+    def test_deselecting_nav_keeps_current_page(self):
         at = fresh()
-        at.session_state["page"] = "Farm"
-        at.run()
-        # soil + water selectboxes are inside the form (after the district one)
-        soil = [s for s in at.selectbox if s.label == "Soil type"][0]
-        soil.select("Sandy loam")
-        form_btn = [b for b in at.button if b.label == "Generate recommendations"][0]
-        form_btn.click()
+        go(at, "Climate")
+        at.session_state["page"] = None
         at.run()
         self.assertFalse(at.exception, at.exception)
-        self.assertIsNotNone(at.session_state["plan"])
+        self.assertEqual(at.session_state["page"], "Climate")
+
+
+class FarmFlowTests(unittest.TestCase):
+    def test_full_flow_generates_recommendations(self):
+        at = fresh()
+        generate(at)
+        self.assertFalse(at.exception, at.exception)
         self.assertEqual(at.session_state["page"], "Recommendations")
-        self.assertTrue(at.session_state["plan"]["rotations"])
+        plan = at.session_state["plan"]
+        self.assertTrue(plan["rotations"])
+        self.assertEqual(at.session_state["profile"]["soil_type"], "sandy-loam")
+
+    def test_every_page_renders_with_a_farm(self):
+        at = fresh()
+        generate(at)
+        for page in PAGES:
+            go(at, page)
+            self.assertFalse(at.exception, f"{page}: {at.exception}")
+
+    def test_not_sure_soil_is_excluded_from_scoring(self):
+        at = fresh()
+        generate(at, soil="Not sure")
+        self.assertIsNone(at.session_state["profile"]["soil_type"])
+        self.assertTrue(any("Soil type not given" in b for b in page_text(at).split("</span>") if b) or
+                        "Soil type not given" in page_text(at))
+
+    def test_irrigated_farm_flows_through(self):
+        at = fresh()
+        go(at, "Farm")
+        widget(at.segmented_control, "Water source").set_value("Borewell")
+        at.run()
+        widget(at.button, "Generate recommendations").click()
+        at.run()
+        self.assertFalse(at.exception, at.exception)
+        self.assertEqual(at.session_state["profile"]["water_availability"], "irrigated")
+
+    def test_previous_crops_reach_the_plan(self):
+        at = fresh()
+        go(at, "Farm")
+        widget(at.pills, "What did you grow recently? (optional)").set_value(["Maize", "Finger millet"])
+        at.run()
+        widget(at.button, "Generate recommendations").click()
+        at.run()
+        self.assertEqual(at.session_state["profile"]["previous_crops"], "Maize, Finger millet")
+
+    def test_flagged_crops_show_verification_badge(self):
+        at = fresh()
+        generate(at)
+        self.assertIn("Needs verification", page_text(at))
+
+
+class GeotagTests(unittest.TestCase):
+    def _pin_mode(self, at):
+        go(at, "Farm")
+        widget(at.segmented_control, "Method").set_value("Pin on map")
+        at.run()
 
     def test_coordinates_outside_coverage_warn(self):
         at = fresh()
-        at.session_state["page"] = "Farm"
-        at.run()
-        [r for r in at.radio if r.label == "Location"][0].set_value("Use coordinates")
-        at.run()
-        [n for n in at.number_input if n.label == "Latitude"][0].set_value(28.6)
-        [n for n in at.number_input if n.label == "Longitude"][0].set_value(77.2)
+        self._pin_mode(at)
+        widget(at.number_input, "Latitude").set_value(28.6)
+        widget(at.number_input, "Longitude").set_value(77.2)
         at.run()
         self.assertFalse(at.exception, at.exception)
-        self.assertTrue(any("only has data" in m.value for m in at.markdown))
+        self.assertIn("only has data", page_text(at))
 
-    def test_map_click_sets_coordinates_and_district(self):
+    def test_map_click_sets_coordinates_and_nearest_district(self):
         at = fresh()
-        at.session_state["page"] = "Farm"
-        at.run()
-        [r for r in at.radio if r.label == "Location"][0].set_value("Use coordinates")
-        at.run()
+        self._pin_mode(at)
         at.session_state["_map_click"] = (16.80, 75.70)  # near Vijayapura
         at.run()
         self.assertFalse(at.exception, at.exception)
-        lat = [n for n in at.number_input if n.label == "Latitude"][0]
-        self.assertAlmostEqual(lat.value, 16.80, places=2)
-        self.assertTrue(any("Vijayapura" in m.value for m in at.markdown))
+        self.assertAlmostEqual(widget(at.number_input, "Latitude").value, 16.80, places=2)
+        self.assertIn("Vijayapura", page_text(at))
 
-    def test_map_page_with_saved_farm(self):
+    def test_pin_inside_coverage_builds_plan_for_nearest_district(self):
         at = fresh()
-        at.session_state["page"] = "Farm"
+        self._pin_mode(at)
+        at.session_state["_map_click"] = (15.46, 75.01)  # Dharwad
         at.run()
-        [b for b in at.button if b.label == "Generate recommendations"][0].click()
-        at.run()
-        at.session_state["page"] = "Map"
+        widget(at.button, "Generate recommendations").click()
         at.run()
         self.assertFalse(at.exception, at.exception)
+        self.assertEqual(at.session_state["plan"]["district"], "Dharwad")
 
-    def test_advisor_without_key_shows_template_and_off_notice(self):
-        import os
-        from unittest import mock
+
+class AdvisorTests(unittest.TestCase):
+    def _no_key_env(self):
         env = {k: v for k, v in os.environ.items() if not k.endswith("_API_KEY")}
-        with mock.patch.dict(os.environ, env, clear=True), mock.patch("dotenv.load_dotenv"):
+        return mock.patch.dict(os.environ, env, clear=True), mock.patch("dotenv.load_dotenv")
+
+    def test_advisor_without_key_shows_summary_and_off_notice(self):
+        env, dot = self._no_key_env()
+        with env, dot:
             at = fresh()
-            at.session_state["page"] = "Farm"
-            at.run()
-            [b for b in at.button if b.label == "Generate recommendations"][0].click()
-            at.run()
-            at.session_state["page"] = "Advisor"
-            at.run()
+            generate(at)
+            go(at, "Advisor")
         self.assertFalse(at.exception, at.exception)
-        text = " ".join(m.value for m in at.markdown)
+        text = page_text(at)
         self.assertIn("AI explanations are off", text)
         self.assertIn("agronomist", text)
 

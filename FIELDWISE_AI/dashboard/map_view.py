@@ -49,7 +49,14 @@ def build_map(
     # Dark look without a paid basemap: invert the tile layer only.
     fmap.get_root().header.add_child(folium.Element(
         "<style>.leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) "
-        "brightness(.85) contrast(.9) saturate(.7);}</style>"
+        "brightness(.85) contrast(.9) saturate(.7);}"
+        ".leaflet-control-attribution{background:rgba(6,10,17,.72)!important;color:#8b9ab0!important;font-size:10px!important;}"
+        ".leaflet-control-attribution a{color:#67e8f9!important;}"
+        ".leaflet-bar a{background:#0f1726!important;color:#e6edf6!important;border-color:rgba(148,163,184,.25)!important;}"
+        ".leaflet-bar a:hover{background:#16233a!important;}"
+        ".leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#0f1726;color:#e6edf6;}"
+        ".leaflet-control-scale-line{background:rgba(6,10,17,.6)!important;color:#8b9ab0!important;"
+        "border-color:#5f6f86!important;}</style>"
     ))
 
     for d in DISTRICTS:
