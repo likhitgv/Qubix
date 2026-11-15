@@ -19,6 +19,9 @@ from config.soils import (
     soil_id_from_label,
     water_availability_from_source,
 )
+from streamlit_folium import st_folium
+
+from dashboard.map_view import build_map
 from dashboard.theme import PLOT_LAYOUT, banner, inject_theme, metric_card, pill
 from modules import kyro_service as svc
 from modules.crop_database import load_crop_database
@@ -27,7 +30,7 @@ st.set_page_config(page_title="Kyro", page_icon="🌱", layout="wide")
 inject_theme()
 
 DISTRICT_NAMES = [d["name"] for d in DISTRICTS]
-PAGES = ["Home", "Farm", "Recommendations", "Climate", "Sustainability", "About"]
+PAGES = ["Home", "Farm", "Recommendations", "Climate", "Map", "Sustainability", "About"]
 
 
 # ----------------------------------------------------------------- data
@@ -105,10 +108,26 @@ def page_farm() -> None:
     if mode == "Pick a district":
         district = st.selectbox("District", DISTRICT_NAMES)
     else:
+        # A map click from the previous run is applied before the inputs exist.
+        click = st.session_state.pop("_map_click", None)
+        if click:
+            st.session_state["farm_lat"], st.session_state["farm_lon"] = click
+        st.session_state.setdefault("farm_lat", 15.4589)
+        st.session_state.setdefault("farm_lon", 75.0078)
         c1, c2 = st.columns(2)
-        lat = c1.number_input("Latitude", -90.0, 90.0, 15.4589, format="%.4f")
-        lon = c2.number_input("Longitude", -180.0, 180.0, 75.0078, format="%.4f")
+        lat = c1.number_input("Latitude", -90.0, 90.0, format="%.4f", key="farm_lat")
+        lon = c2.number_input("Longitude", -180.0, 180.0, format="%.4f", key="farm_lon")
         geo = svc.nearest_district(lat, lon)
+        st.caption("Click the map to place your farm, or type coordinates above.")
+        clicked = st_folium(
+            build_map(geo["district"] if geo["within_coverage"] else None, (lat, lon), _summary()),
+            height=360, use_container_width=True, returned_objects=["last_clicked"],
+            key="farm_map",
+        )
+        last = (clicked or {}).get("last_clicked")
+        if last and (round(last["lat"], 4), round(last["lng"], 4)) != (round(lat, 4), round(lon, 4)):
+            st.session_state["_map_click"] = (round(last["lat"], 4), round(last["lng"], 4))
+            st.rerun()
         if geo["within_coverage"]:
             banner(
                 f"Nearest supported district: <b>{geo['district']}</b> "
@@ -293,6 +312,21 @@ def page_climate() -> None:
     st.caption("Source: NASA POWER daily point data (community AG, UTC). Incomplete seasons are not used for recommendations.")
 
 
+def page_map() -> None:
+    st.header("District map")
+    st.caption("Click a marker for the latest complete NASA POWER seasonal averages.")
+    plan = st.session_state.plan
+    profile = st.session_state.profile
+    point = None
+    if profile and profile.get("latitude") is not None:
+        point = (profile["latitude"], profile["longitude"])
+    st_folium(
+        build_map(plan["district"] if plan else None, point, _summary()),
+        height=520, use_container_width=True, returned_objects=[], key="district_map",
+    )
+    banner("Markers are district reference points, not farm boundaries. " + svc.DATA_NATURE, info=True)
+
+
 def page_sustainability() -> None:
     st.header("Sustainability indicators")
     plan = _need_plan()
@@ -357,5 +391,6 @@ _page = sidebar()
     "Recommendations": page_recommendations,
     "Climate": page_climate,
     "Sustainability": page_sustainability,
+    "Map": page_map,
     "About": page_about,
 }[_page]()

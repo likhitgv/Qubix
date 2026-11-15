@@ -21,7 +21,7 @@ class AppUITests(unittest.TestCase):
 
     def test_every_page_renders(self):
         at = fresh()
-        for page in ["Home", "Farm", "Recommendations", "Climate", "Sustainability", "About"]:
+        for page in ["Home", "Farm", "Recommendations", "Climate", "Map", "Sustainability", "About"]:
             at.session_state["page"] = page
             at.run()
             self.assertFalse(at.exception, f"{page}: {at.exception}")
@@ -58,6 +58,29 @@ class AppUITests(unittest.TestCase):
         at.run()
         self.assertFalse(at.exception, at.exception)
         self.assertTrue(any("only has data" in m.value for m in at.markdown))
+
+    def test_map_click_sets_coordinates_and_district(self):
+        at = fresh()
+        at.session_state["page"] = "Farm"
+        at.run()
+        [r for r in at.radio if r.label == "Location"][0].set_value("Use coordinates")
+        at.run()
+        at.session_state["_map_click"] = (16.80, 75.70)  # near Vijayapura
+        at.run()
+        self.assertFalse(at.exception, at.exception)
+        lat = [n for n in at.number_input if n.label == "Latitude"][0]
+        self.assertAlmostEqual(lat.value, 16.80, places=2)
+        self.assertTrue(any("Vijayapura" in m.value for m in at.markdown))
+
+    def test_map_page_with_saved_farm(self):
+        at = fresh()
+        at.session_state["page"] = "Farm"
+        at.run()
+        [b for b in at.button if b.label == "Generate recommendations"][0].click()
+        at.run()
+        at.session_state["page"] = "Map"
+        at.run()
+        self.assertFalse(at.exception, at.exception)
 
 
 if __name__ == "__main__":
