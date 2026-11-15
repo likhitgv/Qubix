@@ -356,3 +356,154 @@ def load_sample_data(path: str = "data/sample_climate_data.csv") -> pd.DataFrame
     """
 
     return pd.read_csv(path)
+
+
+# ---------------------------------------------------------------------------
+# Seasonal summaries (daily data -> kharif / rabi / summer)
+# ---------------------------------------------------------------------------
+
+# (first month, last month). Rabi runs Nov of year Y to Mar of year Y+1 and
+# is labelled with the year it starts in. Season windows are the common
+# Karnataka agricultural calendar and are an assumption, not an official one.
+SEASON_MONTHS = {
+    "kharif": (6, 10),
+    "rabi": (11, 3),
+    "summer": (4, 5),
+}
+
+_SEASON_COLUMNS = {
+    "temperature_c": ("T2M", "mean"),
+    "temp_max_c": ("T2M_MAX", "mean"),
+    "temp_min_c": ("T2M_MIN", "mean"),
+    "rainfall_mm": ("PRECTOTCORR", "sum"),
+    "rh_percent": ("RH2M", "mean"),
+    "solar_mj_m2_day": ("ALLSKY_SFC_SW_DWN", "mean"),
+}
+
+
+def _season_window(season: str, season_year: int) -> Tuple[pd.Timestamp, pd.Timestamp]:
+    first_month, last_month = SEASON_MONTHS[season]
+    start = pd.Timestamp(season_year, first_month, 1)
+    end_year = season_year + 1 if last_month < first_month else season_year
+    end = pd.Timestamp(end_year, last_month, 1) + pd.offsets.MonthEnd(0)
+    return start, end
+
+
+def _season_label(date_value: pd.Timestamp) -> Tuple[Optional[str], int]:
+    """Return (season, season_year) for a date; season is None if uncovered."""
+
+    month = date_value.month
+    for season, (first, last) in SEASON_MONTHS.items():
+        in_season = (
+            first <= month <= last if first <= last
+            else month >= first or month <= last
+        )
+        if in_season:
+            year = date_value.year - 1 if (first > last and month <= last) else date_value.year
+            return season, year
+    return None, date_value.year
+
+
+def summarise_seasons(daily: pd.DataFrame) -> pd.DataFrame:
+    """
+    Aggregate daily NASA POWER data into per-location seasonal summaries.
+
+    Input columns: date, location, T2M, T2M_MAX, T2M_MIN, PRECTOTCORR,
+    RH2M, ALLSKY_SFC_SW_DWN.
+
+    Output: one row per location/season/season_year with
+    start_date, end_date (full season window), days_available,
+    days_expected, complete, temperature_c, temp_max_c, temp_min_c (means),
+    rainfall_mm (seasonal TOTAL, not mean), rh_percent, solar_mj_m2_day.
+    Seasons with no data are omitted; partial seasons have complete=False.
+    """
+
+    required = {"date", "location"} | {v[0] for v in _SEASON_COLUMNS.values()}
+    missing = required - set(daily.columns)
+    if missing:
+        raise ValueError(f"Missing columns for seasonal summary: {sorted(missing)}")
+
+    data = daily.copy()
+    data["date"] = pd.to_datetime(data["date"])
+    labels = data["date"].apply(_season_label)
+    data["season"] = [label[0] for label in labels]
+    data["season_year"] = [label[1] for label in labels]
+    data = data[data["season"].notna()]
+
+    rows = []
+    for (location, season, season_year), group in data.groupby(
+        ["location", "season", "season_year"], sort=True
+    ):
+        start, end = _season_window(season, int(season_year))
+        expected = (end - start).days + 1
+        available = group["date"].nunique()
+
+        row = {
+            "location": location,
+            "season": season,
+            "season_year": int(season_year),
+            "start_date": start.strftime("%Y-%m-%d"),
+            "end_date": end.strftime("%Y-%m-%d"),
+            "days_available": int(available),
+            "days_expected": int(expected),
+            "complete": bool(available == expected),
+        }
+        for column, (source, how) in _SEASON_COLUMNS.items():
+            series = group[source]
+            value = series.sum(min_count=1) if how == "sum" else series.mean()
+            row[column] = None if pd.isna(value) else round(float(value), 2)
+        rows.append(row)
+
+    return pd.DataFrame(rows)
+
+
+def build_rotation_conditions(
+    seasonal_summary: pd.DataFrame,
+    location: str,
+    seasons: List[str],
+    season_year: Optional[int] = None,
+    require_complete: bool = True,
+) -> List[Dict]:
+    """
+    Build the `seasonal_conditions` list that
+    modules.rotation_engine.generate_crop_rotations() expects.
+
+    For each requested season the values are averaged over the available
+    seasons for that location (complete ones only when require_complete is
+    True). Pass season_year to use one specific year instead.
+    Raises ValueError if the location or a season has no usable data.
+    """
+
+    location_rows = seasonal_summary[seasonal_summary["location"] == location]
+    if location_rows.empty:
+        raise ValueError(f"No seasonal data for location '{location}'.")
+
+    conditions = []
+    for season in seasons:
+        rows = location_rows[location_rows["season"] == season]
+        if season_year is not None:
+            rows = rows[rows["season_year"] == season_year]
+        if require_complete:
+            rows = rows[rows["complete"]]
+        if rows.empty:
+            raise ValueError(
+                f"No {'complete ' if require_complete else ''}data for "
+                f"{location} / {season}"
+                + (f" / {season_year}" if season_year is not None else "")
+                + "."
+            )
+
+        years = [int(y) for y in rows["season_year"]]
+        conditions.append({
+            "season": season,
+            "environmental_data": {
+                "temperature_c": round(float(rows["temperature_c"].mean()), 2),
+                "rainfall_mm": round(float(rows["rainfall_mm"].mean()), 2),
+                "data_source": "NASA POWER daily data (seasonal aggregate)",
+                "season_years_used": years,
+                "rainfall_basis": "seasonal total (mm), not daily",
+                "includes_incomplete_seasons": bool(not rows["complete"].all()),
+            },
+        })
+
+    return conditions
