@@ -70,6 +70,11 @@ class AiExplanationTests(unittest.TestCase):
         r = advisor.ai_explanation(_plan(), post=_post("Dharwad suits these crops."), config=CFG)
         self.assertEqual(r["source"], "ai")
 
+    def test_disclaimer_always_appended_to_ai_text(self):
+        r = advisor.ai_explanation(_plan(), post=_post("Dharwad suits these crops."), config=CFG)
+        self.assertIn("agronomist", r["text"])
+        self.assertIn("modelled", r["text"])
+
     def test_hallucinated_numbers_fall_back(self):
         r = advisor.ai_explanation(_plan(), post=_post("This raises yield by 41 percent."), config=CFG)
         self.assertEqual(r["source"], "template")

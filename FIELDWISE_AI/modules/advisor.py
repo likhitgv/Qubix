@@ -26,7 +26,7 @@ import requests
 PROVIDERS = {
     "groq": {
         "base_url": "https://api.groq.com/openai/v1",
-        "model": "llama-3.3-70b-versatile",
+        "model": "openai/gpt-oss-120b",
         "key_env": "GROQ_API_KEY",
     },
     "gemini": {
@@ -54,7 +54,10 @@ SYSTEM_PROMPT = (
     "- Say that NASA POWER data is gridded and modelled, not measured on the farm.\n"
     "- This is decision support, not agronomic advice: tell the farmer to confirm with "
     "a local agronomist and a soil test.\n"
-    "- Keep it under 220 words. No markdown headings."
+    "- Write crop names exactly as they appear in FACTS (English). In another language "
+    "you may add the local name in brackets, but never replace the English name.\n"
+    "- Never copy field names such as needs_verification; say it in words.\n"
+    "- Plain text only: no markdown, no bullet symbols, no asterisks. Keep it under 180 words."
 )
 
 
@@ -190,7 +193,7 @@ def ai_explanation(
                      "Content-Type": "application/json"},
             json={
                 "model": cfg["model"],
-                "max_tokens": 600,
+                "max_tokens": 1500,  # reasoning models spend tokens thinking first
                 "temperature": 0.2,
                 "messages": [
                     {"role": "system", "content": SYSTEM_PROMPT},
@@ -212,4 +215,6 @@ def ai_explanation(
     if not numbers_are_grounded(text, facts):
         return {"text": fallback, "source": "template",
                 "fallback_reason": "AI reply contained figures not in the computed data."}
+    # Required wording is added by code, never left to the model.
+    text = f"{text}\n\n{plan['data_nature']} {plan['disclaimer']}"
     return {"text": text, "source": "ai", "fallback_reason": None}
