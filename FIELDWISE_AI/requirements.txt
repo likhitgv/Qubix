@@ -3,3 +3,9 @@ pandas>=2.0.0
 earthaccess
 xarray
 netCDF4
+
+# Frontend dependencies
+streamlit
+plotly
+folium
+streamlit-folium
