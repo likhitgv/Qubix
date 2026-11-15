@@ -23,6 +23,7 @@ from streamlit_folium import st_folium
 
 from dashboard.map_view import build_map
 from dashboard.theme import PLOT_LAYOUT, banner, inject_theme, metric_card, pill
+from modules import advisor
 from modules import kyro_service as svc
 from modules.crop_database import load_crop_database
 
@@ -30,7 +31,7 @@ st.set_page_config(page_title="Kyro", page_icon="🌱", layout="wide")
 inject_theme()
 
 DISTRICT_NAMES = [d["name"] for d in DISTRICTS]
-PAGES = ["Home", "Farm", "Recommendations", "Climate", "Map", "Sustainability", "About"]
+PAGES = ["Home", "Farm", "Recommendations", "Climate", "Map", "Sustainability", "Advisor", "About"]
 
 
 # ----------------------------------------------------------------- data
@@ -357,6 +358,37 @@ def page_sustainability() -> None:
                 st.markdown(pill(ind["name"], tone.get(ind["status"], "blue")) + ind["detail"], unsafe_allow_html=True)
 
 
+def page_advisor() -> None:
+    st.header("Kyro Advisor")
+    plan = _need_plan()
+    if not plan:
+        return
+    st.markdown("#### Plain-language summary")
+    st.write(advisor.template_explanation(plan))
+    st.caption("Built only from Kyro's computed results. Works offline.")
+
+    st.markdown("#### Ask Kyro AI")
+    if not advisor.ai_available():
+        banner(
+            "AI explanations are off. Set the ANTHROPIC_API_KEY environment variable "
+            "and restart Kyro to enable them. The summary above always works.",
+            info=True,
+        )
+        return
+    language = st.selectbox("Language", ["English", "Kannada", "Hindi"])
+    if st.button("Explain with AI"):
+        with st.spinner("Asking Kyro AI…"):
+            result = advisor.ai_explanation(plan, language=language)
+        st.session_state["ai_result"] = result
+    result = st.session_state.get("ai_result")
+    if result:
+        if result["source"] == "ai":
+            st.markdown(pill("AI-generated", "blue") + "checked against Kyro's computed numbers", unsafe_allow_html=True)
+        else:
+            banner(f"Showing the standard summary instead. {result['fallback_reason']}")
+        st.write(result["text"])
+
+
 def page_about() -> None:
     st.header("About Kyro")
     st.markdown(
@@ -392,5 +424,6 @@ _page = sidebar()
     "Climate": page_climate,
     "Sustainability": page_sustainability,
     "Map": page_map,
+    "Advisor": page_advisor,
     "About": page_about,
 }[_page]()

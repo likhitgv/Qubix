@@ -21,7 +21,7 @@ class AppUITests(unittest.TestCase):
 
     def test_every_page_renders(self):
         at = fresh()
-        for page in ["Home", "Farm", "Recommendations", "Climate", "Map", "Sustainability", "About"]:
+        for page in ["Home", "Farm", "Recommendations", "Climate", "Map", "Sustainability", "Advisor", "About"]:
             at.session_state["page"] = page
             at.run()
             self.assertFalse(at.exception, f"{page}: {at.exception}")
@@ -81,6 +81,23 @@ class AppUITests(unittest.TestCase):
         at.session_state["page"] = "Map"
         at.run()
         self.assertFalse(at.exception, at.exception)
+
+    def test_advisor_without_key_shows_template_and_off_notice(self):
+        import os
+        from unittest import mock
+        env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
+        with mock.patch.dict(os.environ, env, clear=True):
+            at = fresh()
+            at.session_state["page"] = "Farm"
+            at.run()
+            [b for b in at.button if b.label == "Generate recommendations"][0].click()
+            at.run()
+            at.session_state["page"] = "Advisor"
+            at.run()
+        self.assertFalse(at.exception, at.exception)
+        text = " ".join(m.value for m in at.markdown)
+        self.assertIn("AI explanations are off", text)
+        self.assertIn("agronomist", text)
 
 
 if __name__ == "__main__":

@@ -7,3 +7,4 @@ streamlit>=1.40
 plotly>=5.20
 folium>=0.17
 streamlit-folium>=0.22
+anthropic>=0.40
