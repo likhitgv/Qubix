@@ -102,3 +102,12 @@ Every recommendation is saved to a local SQLite file, `data/kairo.db` (created a
 ignored by git). Open or delete earlier plans from "Your saved plans" on the Recommendation page.
 Set `KAIRO_DB_PATH` to store the file somewhere else. Only the field answers and the computed
 plan are stored; the crop and climate reference data remain CSV files.
+
+## Use of AI (disclosure)
+
+This project used AI tools. Anthropic's Claude (through Claude Code) helped the team write and review code,
+tests and documentation and draft the interface; the team directed the work and reviewed the results. An
+optional Advisor feature can send KAIRO's own computed results to a hosted language model (Groq by default,
+key in `.env`) to explain them; the reply is accepted only if every number matches KAIRO's computed data.
+Crop reference data and all weather data come from the cited sources, not from AI. See `docs/Submission.md`
+for the NASA Space Apps submission text.
