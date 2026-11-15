@@ -1,0 +1,7 @@
+﻿dataset,variable,unit,total_records,grid_points,missing_observations,duplicate_grid_date_records,start_date,end_date,years
+meteorological,T2M,deg C,281358,882,1764,0,2026-01-01,2026-11-15,2026
+meteorological,T2M_MAX,deg C,281358,882,1764,0,2026-01-01,2026-11-15,2026
+meteorological,T2M_MIN,deg C,281358,882,1764,0,2026-01-01,2026-11-15,2026
+meteorological,PRECTOTCORR,mm/day,281358,882,1764,0,2026-01-01,2026-11-15,2026
+meteorological,RH2M,percent,281358,882,1764,0,2026-01-01,2026-11-15,2026
+solar,ALLSKY_SFC_SW_DWN,MJ/m2/day,87725,275,20900,0,2026-01-01,2026-11-15,2026

@@ -1,0 +1,7 @@
+﻿dataset,variable,total_records,grid_points,unique_dates,missing_observations,duplicate_records,start_date,end_date
+meteorological,T2M,1891890,882,2145,1764,0,2021-01-01,2026-11-15
+meteorological,T2M_MAX,1891890,882,2145,1764,0,2021-01-01,2026-11-15
+meteorological,T2M_MIN,1891890,882,2145,1764,0,2021-01-01,2026-11-15
+meteorological,PRECTOTCORR,1891890,882,2145,1764,0,2021-01-01,2026-11-15
+meteorological,RH2M,1891890,882,2145,1764,0,2021-01-01,2026-11-15
+solar,ALLSKY_SFC_SW_DWN,589875,275,2145,20900,0,2021-01-01,2026-11-15

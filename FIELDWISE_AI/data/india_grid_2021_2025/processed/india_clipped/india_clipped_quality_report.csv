@@ -1,0 +1,7 @@
+﻿dataset,variable,unit,total_records,grid_points,missing_observations,duplicate_grid_date_records,start_date,end_date,years,geographic_filter
+meteorological,T2M,deg C,1610532,882,0,0,2021-01-01,2025-12-31,2021-2025,Natural Earth India boundary
+meteorological,T2M_MAX,deg C,1610532,882,0,0,2021-01-01,2025-12-31,2021-2025,Natural Earth India boundary
+meteorological,T2M_MIN,deg C,1610532,882,0,0,2021-01-01,2025-12-31,2021-2025,Natural Earth India boundary
+meteorological,PRECTOTCORR,mm/day,1610532,882,0,0,2021-01-01,2025-12-31,2021-2025,Natural Earth India boundary
+meteorological,RH2M,percent,1610532,882,0,0,2021-01-01,2025-12-31,2021-2025,Natural Earth India boundary
+solar,ALLSKY_SFC_SW_DWN,MJ/m2/day,502150,275,0,0,2021-01-01,2025-12-31,2021-2025,Natural Earth India boundary

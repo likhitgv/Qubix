@@ -178,11 +178,29 @@ def load_nasa_power_data(file_path):
             f"Missing NASA columns: {missing_columns}"
         )
 
-    # Convert NASA date format (YYYYMMDD)
-    nasa_data["date"] = pd.to_datetime(
-        nasa_data["date"].astype(str),
+     # Support both NASA date formats: YYYY-MM-DD and YYYYMMDD
+    date_values = nasa_data["date"].astype(str).str.strip()
+
+    parsed_dates = pd.to_datetime(
+        date_values,
+        format="%Y-%m-%d",
+        errors="coerce"
+    )
+
+    missing_dates = parsed_dates.isna()
+
+    parsed_dates.loc[missing_dates] = pd.to_datetime(
+        date_values.loc[missing_dates],
         format="%Y%m%d",
         errors="coerce"
+    )
+
+    nasa_data["date"] = parsed_dates
+
+       # Remove previously converted columns to avoid duplicates
+    nasa_data = nasa_data.drop(
+        columns=["temperature_c", "rainfall_mm"],
+        errors="ignore"
     )
 
     # Convert NASA column names
@@ -190,8 +208,7 @@ def load_nasa_power_data(file_path):
         "T2M": "temperature_c",
         "PRECTOTCORR": "rainfall_mm"
     })
-
-    # Add source information
+ # Add source information
     converted_data["source"] = "NASA POWER"
 
     # Clean and validate the converted data

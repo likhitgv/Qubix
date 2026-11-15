@@ -1,0 +1,7 @@
+dataset,variable,unit,data_source,total_records,missing_observations,duplicate_grid_date_records,unique_grid_points,start_date,end_date
+meteorological,T2M,°C,MERRA-2,5697120,0,0,3120,2021-01-01,2025-12-31
+meteorological,T2M_MAX,°C,MERRA-2 / POWER,5697120,0,0,3120,2021-01-01,2025-12-31
+meteorological,T2M_MIN,°C,MERRA-2 / POWER,5697120,0,0,3120,2021-01-01,2025-12-31
+meteorological,PRECTOTCORR,mm/day,MERRA-2,5697120,0,0,3120,2021-01-01,2025-12-31
+meteorological,RH2M,%,MERRA-2 / POWER,5697120,2,0,3120,2021-01-01,2025-12-31
+solar,ALLSKY_SFC_SW_DWN,MJ/m²/day,SYN1DEG,1752960,0,0,960,2021-01-01,2025-12-31
