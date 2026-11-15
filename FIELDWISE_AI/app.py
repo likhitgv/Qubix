@@ -16,7 +16,7 @@ import streamlit as st
 from dotenv import load_dotenv
 from streamlit_folium import st_folium
 
-from config.districts import DISTRICTS
+from config.districts import DISTRICTS, districts_in_state, get_india_district, list_states
 from config.soils import (
     SOIL_TYPES,
     WATER_SOURCES,
@@ -78,20 +78,15 @@ def _grid_summary() -> pd.DataFrame:
     return svc.load_grid_summary()
 
 
-def _district_grid_id(name: str | None) -> str | None:
-    """NASA grid cell for a validated district, so district and pin results agree.
-
-    Both read the same NASA grid; the multi-year record averages more seasons.
-    Returns None (falling back to the district file) if the grid files are missing
-    or the name is not one of the five districts.
-    """
-    district = next((d for d in DISTRICTS if d["name"] == name), None)
-    if district is None:
+def _grid_id_for(lat: float | None, lon: float | None) -> str | None:
+    """NASA grid cell id for a location, or None if the grid files are missing/too far."""
+    if lat is None or lon is None:
         return None
     try:
-        return svc.nearest_grid_point(district["latitude"], district["longitude"], _grid_points())["grid_id"]
+        g = svc.nearest_grid_point(lat, lon, _grid_points())
     except FileNotFoundError:
         return None
+    return g["grid_id"] if g["within_coverage"] else None
 
 
 def _slug(text: str) -> str:
@@ -192,6 +187,7 @@ def page_farm() -> None:
 
     left, right = st.columns([1.05, 1], gap="large")
     district = None
+    district_rec = None
     lat = lon = None
     geo = None
 
@@ -201,7 +197,23 @@ def page_farm() -> None:
             mode = st.segmented_control("Method", ["District", "Pin on map"], key="loc_mode", label_visibility="collapsed")
             mode = mode or "District"
             if mode == "District":
-                district = st.pills("District", DISTRICT_NAMES, selection_mode="single", key="farm_district")
+                st.session_state.setdefault("farm_state", "Karnataka")
+                c1, c2 = st.columns(2)
+                state = c1.selectbox("State / UT", list_states(), key="farm_state")
+                names = [d["district"] for d in districts_in_state(state)]
+                if st.session_state.get("farm_district") not in names:
+                    st.session_state["farm_district"] = names[0]
+                dname = c2.selectbox("District", names, key="farm_district")
+                district_rec = get_india_district(state, dname)
+                district = district_rec["label"]
+                note = "Districts follow Census 2011 boundaries; districts created since then are not listed."
+                if state == "Andhra Pradesh":
+                    note += " Telangana's districts appear here because Telangana was part of Andhra Pradesh in 2011."
+                st.caption(note)
+                if district_rec["validated"]:
+                    ui.banner("This is one of the five districts KAIRO was validated for.", "ok")
+                else:
+                    ui.banner(svc.OUTSIDE_KARNATAKA_NOTE)
             else:
                 c1, c2 = st.columns(2)
                 lat = c1.number_input("Latitude", -90.0, 90.0, format="%.4f", key="farm_lat")
@@ -246,8 +258,17 @@ def page_farm() -> None:
         with st.container(border=True):
             if mode == "District":
                 st.markdown("##### :material/map: Selected district")
-                preview = build_map(district, None, _summary())
-                st_folium(preview, height=430, use_container_width=True, returned_objects=[], key="farm_map_district")
+                dlat, dlon = district_rec["latitude"], district_rec["longitude"]
+                gid = _grid_id_for(dlat, dlon)
+                gpt = None
+                if gid:
+                    row = _grid_points().set_index("grid_id").loc[gid]
+                    gpt = (float(row["latitude"]), float(row["longitude"]))
+                preview = build_map(
+                    district_rec["district"] if district_rec["validated"] else None,
+                    (dlat, dlon), _summary(), grid_link=gpt, center=(dlat, dlon), zoom=8,
+                )
+                st_folium(preview, height=430, use_container_width=True, returned_objects=[], key=f"farm_map_district_{state}_{dname}")
             else:
                 st.markdown("##### :material/touch_app: Click the map to place your farm")
                 clicked = st_folium(
@@ -267,7 +288,7 @@ def page_farm() -> None:
     st.write("")
     if st.button("Generate recommendations", type="primary", key="generate"):
         if district is None:
-            st.error("Choose a district, or drop a pin inside India.")
+            st.error("Choose a state and district, or drop a pin inside India.")
             return
         soil_label = soil_label or "Not sure"
         water_label = water_label or "Rainfed"
@@ -279,9 +300,13 @@ def page_farm() -> None:
             "water_label": water_label,
             "area_ha": st.session_state["farm_area"],
             "previous_crops": ", ".join(previous) if previous else None,
-            "latitude": lat,
-            "longitude": lon,
-            "grid_id": geo["grid_id"] if geo and geo["within_coverage"] else _district_grid_id(district),
+            "latitude": district_rec["latitude"] if district_rec else lat,
+            "longitude": district_rec["longitude"] if district_rec else lon,
+            "state": district_rec["state"] if district_rec else None,
+            "grid_id": (
+                _grid_id_for(district_rec["latitude"], district_rec["longitude"]) if district_rec
+                else (geo["grid_id"] if geo and geo["within_coverage"] else None)
+            ),
         }
         try:
             plan = svc.build_plan(profile, _grid_summary() if profile["grid_id"] else _summary())

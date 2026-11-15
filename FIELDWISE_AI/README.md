@@ -75,3 +75,23 @@ NASA POWER is a gridded product derived from satellite observations and
 reanalysis models; it is not a direct field or weather-station measurement.
 If the API is unreachable, use `load_sample_data()` and disclose the data as
 SAMPLE/demo data.
+
+## All-India coverage and the state → district picker
+
+KAIRO can plan for any location in India, using the nearest cell of the downloaded NASA
+POWER grid (882 points, ~56 km apart, daily 2021–2026). The Farm page lets you choose a
+**state, then a district**, or drop a pin on the map.
+
+- Only the five Karnataka districts (Ballari, Shivamogga, Vijayapura, Belagavi, Dharwad)
+  were validated. Everywhere else shows a caution: the crop database was assembled for
+  Karnataka and has only 6 crops.
+- Districts come from Census 2011 boundaries (datameet/maps): Telangana appears under
+  Andhra Pradesh and newer districts are missing.
+
+Rebuild the derived data (outputs are small and committed; the daily grid is Git LFS):
+
+```bash
+py -3.11 -m examples.build_india_seasonal_summary
+py -3.11 -m pip install pyshp
+py -3.11 -m examples.build_india_districts <path-to>/2011_Dist
+```

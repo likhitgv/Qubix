@@ -42,6 +42,8 @@ def build_map(
     grid_points: Optional[pd.DataFrame] = None,
     grid_link: Optional[tuple[float, float]] = None,
     india_view: bool = False,
+    center: Optional[tuple[float, float]] = None,
+    zoom: Optional[int] = None,
 ) -> folium.Map:
     """Build a Folium map. Pure function: no Streamlit calls, easy to test.
 
@@ -51,8 +53,8 @@ def build_map(
     to the whole country.
     """
     fmap = folium.Map(
-        location=INDIA_CENTER if india_view else KARNATAKA_CENTER,
-        zoom_start=5 if india_view else 7,
+        location=center or (INDIA_CENTER if india_view else KARNATAKA_CENTER),
+        zoom_start=zoom or (5 if india_view else 7),
         tiles="OpenStreetMap",  # free, no API key
         control_scale=True,
     )
