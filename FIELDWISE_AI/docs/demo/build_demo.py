@@ -27,7 +27,7 @@ HERE = Path(__file__).resolve().parent
 SCREENS = HERE / "screens"
 
 # ----------------------------------------------------------------- edit me
-TEAM = "[Add team name and member names]"
+TEAM = "Qubix"
 REPO = "github.com/likhitgv/Qubix"
 # -------------------------------------------------------------------------
 

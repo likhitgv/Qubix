@@ -72,3 +72,45 @@ The same statement is shown inside the app (About page) and in the README.
 - [ ] Repository is public (it is) and the latest code is on `main`
 - [ ] Use the lock toggle on the submission page so two people do not overwrite each other
 - [ ] Submit before 11:59 pm local time, then download the participant certificate (PDF)
+
+## Answers for the submission form (copy and paste)
+
+**Project Name:** KAIRO
+
+**Project Demonstration (link):**
+https://github.com/likhitgv/Qubix/blob/main/FIELDWISE_AI/docs/demo/KAIRO_Demo.pdf
+(7 slides. A YouTube link to `KAIRO_Demo_28s.mp4` also works; use one public link, no password.)
+
+**Project (link to your project):** https://github.com/likhitgv/Qubix
+
+**Project Details:**
+
+KAIRO is a crop-planning tool for farmers and local agronomists in India. A user chooses a state and district (or drops a pin on a map) and answers three questions: soil type, how the field is irrigated, and what was grown before. KAIRO then recommends a two-season plan (kharif, then rabi) with a best option, the reasons it may fit, the main trade-off, and two alternatives.
+
+How it works: we downloaded NASA POWER daily weather (temperature, rainfall, humidity) for 882 grid points covering India, 2021-2026, and turned it into seasonal summaries. Each field uses its nearest NASA grid cell, and past kharif and rabi seasons are averaged. These are compared with crop needs in a sourced crop database using transparent rule-based scoring, then combined into rotations (a bonus for including a legume, a penalty for repeating a crop family). Every score can be opened under "How this was calculated". A NASA GPM IMERG rainfall sample was used to cross-check rainfall.
+
+Impact: it gives farmers local, plain-language guidance grounded in NASA data and shows its reasoning instead of acting as a black box. Saved plans let users return to earlier recommendations.
+
+Tools: Python, Streamlit, pandas, Plotly, Folium with OpenStreetMap, SQLite, NASA POWER data, Census 2011 district boundaries.
+
+Creativity: a guided four-question flow, a trade-off-first recommendation, and an honesty-first design: unverified crop data is flagged in the app, and KAIRO says it is decision support, not agronomic advice.
+
+Limits: validated only in five Karnataka districts; six crops; some crop figures are still being verified; NASA POWER is modelled data for a ~56 km area, not a field measurement; no yield or savings claims are made.
+
+AI use: built with Anthropic's Claude (Claude Code) assisting with code, tests and documentation. An optional feature can ask a hosted language model (Groq) to explain KAIRO's results; its text is accepted only if every number matches KAIRO's computed data.
+
+**NASA Data links (Link Text / Link URL):**
+
+| Link Text | Link URL |
+|---|---|
+| NASA POWER daily point and gridded data (temperature, rainfall, humidity) | https://power.larc.nasa.gov/ |
+| NASA GPM IMERG Final V07B rainfall (January 2025 sample, cross-check) | https://gpm.nasa.gov/data/imerg |
+
+**Space Agency Partner & Other Data (Link Text / Link URL):**
+
+| Link Text | Link URL |
+|---|---|
+| India Census 2011 district boundaries (datameet) | https://github.com/datameet/maps |
+| OpenStreetMap map tiles | https://www.openstreetmap.org/copyright |
+| TNAU Agritech crop production guides (crop reference data) | https://agritech.tnau.ac.in/ |
+| Streamlit (app framework) | https://streamlit.io/ |
