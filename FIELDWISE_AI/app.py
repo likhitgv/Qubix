@@ -313,7 +313,18 @@ def page_climate() -> None:
         seas[["season", "season_year", "days_available", "complete", "temperature_c", "rainfall_mm"]],
         hide_index=True, width="stretch",
     )
-    st.caption("Source: NASA POWER daily point data (community AG, UTC). Incomplete seasons are not used for recommendations.")
+    meta = svc.load_provenance(district)
+    with st.expander("Data source and coverage"):
+        if meta:
+            st.markdown(
+                f"- **Source:** {meta.get('source', 'NASA POWER')} daily point API (community AG, UTC)\n"
+                f"- **Period:** {meta.get('start_date', 'not recorded')} to {meta.get('end_date', 'not recorded')}\n"
+                f"- **Retrieved:** {meta.get('retrieved_at', 'not recorded')}\n"
+                f"- **Grid point:** {meta.get('latitude')}, {meta.get('longitude')}"
+            )
+        else:
+            st.write("No provenance record found for this district.")
+        st.caption("Incomplete seasons are not used for recommendations.")
 
 
 def page_map() -> None:

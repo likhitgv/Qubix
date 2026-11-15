@@ -6,6 +6,7 @@ comes from NASA POWER files (or a live NASA POWER fetch); nothing is invented.
 
 from __future__ import annotations
 
+import json
 import math
 from pathlib import Path
 from typing import Any, Optional
@@ -68,6 +69,22 @@ def nearest_district(latitude: float, longitude: float) -> dict[str, Any]:
             "the exact farm point."
         ),
     }
+
+
+def load_provenance(district: str) -> dict[str, Any]:
+    """Return recorded source/coverage details for a district's stored NASA data.
+
+    Reads provenance_seasonal.json (written when the data was fetched). Missing
+    file or district yields an empty dict so the UI can say "not recorded".
+    """
+    path = DATA_DIR / "provenance_seasonal.json"
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data.get(district, {})
 
 
 def load_seasonal_summary(path: Optional[Path] = None) -> pd.DataFrame:

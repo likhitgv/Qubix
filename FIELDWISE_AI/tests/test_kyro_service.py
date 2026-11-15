@@ -57,5 +57,15 @@ class PlanTests(unittest.TestCase):
                 svc.fetch_live_seasonal_summary("Ballari")
 
 
+class ProvenanceTests(unittest.TestCase):
+    def test_known_district_has_source_and_period(self):
+        meta = svc.load_provenance("Ballari")
+        self.assertEqual(meta["source"], "NASA POWER")
+        self.assertIn("start_date", meta)
+
+    def test_unknown_district_is_empty(self):
+        self.assertEqual(svc.load_provenance("Atlantis"), {})
+
+
 if __name__ == "__main__":
     unittest.main()
