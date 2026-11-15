@@ -3,7 +3,7 @@
 import unittest
 from unittest import mock
 
-from modules import kyro_service as svc
+from modules import kairo_service as svc
 from modules.nasa_api import NASAPowerError
 
 

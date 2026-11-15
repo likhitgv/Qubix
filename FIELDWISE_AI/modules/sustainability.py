@@ -1,4 +1,4 @@
-"""Rule-based sustainability indicators for Kyro crop rotations.
+"""Rule-based sustainability indicators for KAIRO crop rotations.
 
 Everything here is derived only from fields in the crop database (crop family,
 legume flag, water requirement) and from the rotation the engine produced.

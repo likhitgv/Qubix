@@ -1,4 +1,4 @@
-# \# Kyro – NASA Environmental Data Documentation
+# \# KAIRO – NASA Environmental Data Documentation
 
 # 
 
@@ -392,7 +392,7 @@
 
 # 
 
-# \*\*Project:\*\* Kyro  
+# \*\*Project:\*\* KAIRO  
 
 # \*\*Module:\*\* NASA Environmental Data Collection  
 

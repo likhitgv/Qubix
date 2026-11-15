@@ -6,7 +6,7 @@ import pandas as pd
 
 
 # --------------------------------------------------
-# Kyro - INDIA-WIDE NASA DATA PROCESSING
+# KAIRO - INDIA-WIDE NASA DATA PROCESSING
 # --------------------------------------------------
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -188,7 +188,7 @@ def create_quality_report(meteorological, solar):
 def main():
 
     print("=" * 60)
-    print("Kyro - INDIA-WIDE DATA PROCESSING")
+    print("KAIRO - INDIA-WIDE DATA PROCESSING")
     print("=" * 60)
 
     print("\nProcessing meteorological data...")

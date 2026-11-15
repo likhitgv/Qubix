@@ -20,7 +20,7 @@ farm = {
 # Calculate crop rankings
 results = rank_crops(crops, environment, farm)
 
-print("\n========== Kyro ==========")
+print("\n========== KAIRO ==========")
 print("       CROP SUITABILITY RESULTS")
 print("==================================")
 

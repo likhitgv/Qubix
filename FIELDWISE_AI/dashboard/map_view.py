@@ -1,4 +1,4 @@
-"""Folium map for Kyro: district markers, selected district, farm pin."""
+"""Folium map for KAIRO: district markers, selected district, farm pin."""
 
 from __future__ import annotations
 

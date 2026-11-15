@@ -1,6 +1,6 @@
 
 """
-Kyro - Crop Rotation Engine
+KAIRO - Crop Rotation Engine
 
 Member 3: Crop Intelligence & Rotation Developer
 

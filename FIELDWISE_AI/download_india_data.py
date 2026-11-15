@@ -11,7 +11,7 @@ import requests
 
 
 # --------------------------------------------------
-# Kyro - INDIA NASA POWER DOWNLOADER
+# KAIRO - INDIA NASA POWER DOWNLOADER
 # --------------------------------------------------
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -276,7 +276,7 @@ def main():
     )
 
     print("=" * 60)
-    print("Kyro - NASA POWER DATA DOWNLOAD")
+    print("KAIRO - NASA POWER DATA DOWNLOAD")
     print("Tiles:", len(selected_tiles))
     print("Years:", args.start_year, "to", args.end_year)
     print("Variables:", len(VARIABLES))

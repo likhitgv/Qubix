@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from modules import advisor
-from modules.kyro_service import build_plan
+from modules.kairo_service import build_plan
 
 
 def _plan():
@@ -113,7 +113,7 @@ class AiExplanationTests(unittest.TestCase):
 class ProviderConfigTests(unittest.TestCase):
     def _env(self, **extra):
         base = {k: v for k, v in os.environ.items()
-                if not k.endswith("_API_KEY") and not k.startswith("KYRO_")}
+                if not k.endswith("_API_KEY") and not k.startswith(("KAIRO_", "KYRO_"))}
         base.update(extra)
         return mock.patch.dict(os.environ, base, clear=True)
 
@@ -124,19 +124,29 @@ class ProviderConfigTests(unittest.TestCase):
         self.assertIn("groq.com", cfg["base_url"])
 
     def test_switch_to_gemini(self):
-        with self._env(KYRO_AI_PROVIDER="gemini", GEMINI_API_KEY="k"):
+        with self._env(KAIRO_AI_PROVIDER="gemini", GEMINI_API_KEY="k"):
             self.assertEqual(advisor.provider_config()["provider"], "gemini")
 
     def test_wrong_key_for_provider_is_unavailable(self):
-        with self._env(KYRO_AI_PROVIDER="gemini", GROQ_API_KEY="k"):
+        with self._env(KAIRO_AI_PROVIDER="gemini", GROQ_API_KEY="k"):
             self.assertFalse(advisor.ai_available())
 
     def test_unknown_provider_unavailable(self):
-        with self._env(KYRO_AI_PROVIDER="nope", GROQ_API_KEY="k"):
+        with self._env(KAIRO_AI_PROVIDER="nope", GROQ_API_KEY="k"):
             self.assertFalse(advisor.ai_available())
 
+    def test_legacy_kyro_variables_still_work(self):
+        with self._env(KYRO_AI_PROVIDER="gemini", GEMINI_API_KEY="k", KYRO_MODEL="old-name"):
+            cfg = advisor.provider_config()
+        self.assertEqual(cfg["provider"], "gemini")
+        self.assertEqual(cfg["model"], "old-name")
+
+    def test_kairo_variable_wins_over_legacy(self):
+        with self._env(KAIRO_MODEL="new", KYRO_MODEL="old", GROQ_API_KEY="k"):
+            self.assertEqual(advisor.provider_config()["model"], "new")
+
     def test_model_override(self):
-        with self._env(GROQ_API_KEY="k", KYRO_MODEL="custom-model"):
+        with self._env(GROQ_API_KEY="k", KAIRO_MODEL="custom-model"):
             self.assertEqual(advisor.provider_config()["model"], "custom-model")
 
 

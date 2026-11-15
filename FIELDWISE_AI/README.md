@@ -1,17 +1,17 @@
-# Kyro
+# KAIRO
 
 A project for climate-aware crop recommendations, crop suitability analysis,
 crop rotation planning, and sustainable farming insights.
 
-## What Kyro does
+## What KAIRO does
 
 Pick a Karnataka district (or click your farm on the map), describe your soil and
-water, and Kyro ranks multi-season crop rotations from NASA POWER climate data and a
+water, and KAIRO ranks multi-season crop rotations from NASA POWER climate data and a
 sourced crop database. Every score is explained; crops whose reference data still
 needs verification are flagged. Pages: Home, Farm, Recommendations, Climate, Map,
 Sustainability, Advisor, About.
 
-Kyro is decision support, not agronomic advice. NASA POWER is a gridded, modelled
+KAIRO is decision support, not agronomic advice. NASA POWER is a gridded, modelled
 product, not a field measurement.
 
 ## Quick start
@@ -34,7 +34,7 @@ FIELDWISE_AI/            (folder name kept so existing clones keep working)
 ├── dashboard/           theme.py (UI theme), map_view.py (Folium map)
 ├── modules/
 │   ├── nasa_api.py          NASA POWER fetch + seasonal summaries
-│   ├── kyro_service.py      farm profile -> plan; geotag -> nearest district
+│   ├── kairo_service.py      farm profile -> plan; geotag -> nearest district
 │   ├── crop_database.py / crop_suitability_v2.py / rotation_engine.py
 │   ├── sustainability.py    rule-based rotation indicators (not measurements)
 │   └── advisor.py           offline summary + optional grounded Claude explanation

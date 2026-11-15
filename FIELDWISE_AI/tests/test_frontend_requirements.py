@@ -1,4 +1,4 @@
-"""Required Kyro dependencies must be declared in requirements.txt.
+"""Required KAIRO dependencies must be declared in requirements.txt.
 
 Adapted from the teammate's test on feature/member-1-updates.
 """

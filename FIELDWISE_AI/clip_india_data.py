@@ -116,7 +116,7 @@ def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     print("=" * 55)
-    print("Kyro - INDIA DATA CLIPPING")
+    print("KAIRO - INDIA DATA CLIPPING")
     print("=" * 55)
 
     india = load_boundary()

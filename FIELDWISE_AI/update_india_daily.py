@@ -413,7 +413,7 @@ def main():
             )
 
     print("=" * 60)
-    print("Kyro - NASA POWER DAILY UPDATER")
+    print("KAIRO - NASA POWER DAILY UPDATER")
     print("=" * 60)
 
     print("Tiles:", len(selected_tiles))
