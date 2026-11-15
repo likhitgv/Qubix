@@ -1,6 +1,6 @@
 
 """
-FIELDWISE AI - Crop Suitability Engine V2
+Kyro - Crop Suitability Engine V2
 
 Member 3: Crop Intelligence & Rotation Developer
 
@@ -181,12 +181,18 @@ def _water_score(
     if not water_availability or not crop_water_requirement:
         return None
 
-    return (
-        100.0
-        if _normalise(water_availability)
-        == _normalise(crop_water_requirement)
-        else 0.0
-    )
+    farm = _normalise(water_availability)
+    crop_need = _normalise(crop_water_requirement)
+
+    if farm == crop_need:
+        return 100.0
+
+    # A farm with irrigation can still grow a crop that only needs rain.
+    # The reverse (rainfed farm, crop that needs irrigation) is a mismatch.
+    if farm == "irrigated" and crop_need == "rainfed":
+        return 100.0
+
+    return 0.0
 
 
 def _season_score(

@@ -1,4 +1,4 @@
-# FIELDWISE_AI
+# Kyro
 
 A project for climate-aware crop recommendations, crop suitability analysis,
 crop rotation planning, and sustainable farming insights.

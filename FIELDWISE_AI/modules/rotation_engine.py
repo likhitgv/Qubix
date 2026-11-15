@@ -1,6 +1,6 @@
 
 """
-FIELDWISE AI - Crop Rotation Engine
+Kyro - Crop Rotation Engine
 
 Member 3: Crop Intelligence & Rotation Developer
 

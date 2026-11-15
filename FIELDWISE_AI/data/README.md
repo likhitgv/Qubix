@@ -1,4 +1,4 @@
-# \# FIELDWISE AI – NASA Environmental Data Documentation
+# \# Kyro – NASA Environmental Data Documentation
 
 # 
 
@@ -392,7 +392,7 @@
 
 # 
 
-# \*\*Project:\*\* FIELDWISE AI  
+# \*\*Project:\*\* Kyro  
 
 # \*\*Module:\*\* NASA Environmental Data Collection  
 

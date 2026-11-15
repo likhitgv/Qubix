@@ -1,4 +1,4 @@
-"""District and region configuration for FIELDWISE AI.
+"""District and region configuration for Kyro.
 
 Coordinates are representative points for each district (district HQ area),
 NOT claims that every farm in the district shares the same climate or soil.

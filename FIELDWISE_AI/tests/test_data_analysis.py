@@ -21,7 +21,7 @@ DATA_FILE = PROJECT_FOLDER / "data" / "sample_climate_data.csv"
 # Load and clean the sample climate data
 cleaned_data, report = load_climate_data(DATA_FILE)
 
-print("\n========== FIELDWISE AI DATA CLEANING TEST ==========")
+print("\n========== Kyro DATA CLEANING TEST ==========")
 
 print("\nCleaned Climate Data:")
 print(cleaned_data.to_string(index=False))

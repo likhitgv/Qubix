@@ -31,7 +31,7 @@ def load_india_boundary():
 
 def main():
     print("=" * 55)
-    print("FIELDWISE AI - INDIA BOUNDARY CLIPPING")
+    print("Kyro - INDIA BOUNDARY CLIPPING")
     print("=" * 55)
 
     india = load_india_boundary()

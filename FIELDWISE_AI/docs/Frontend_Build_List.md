@@ -1,7 +1,7 @@
-# FIELDWISE AI - Front-End Build List
+# Kyro - Front-End Build List
 
 **For:** Member 4 (Frontend & Dashboard Developer)
-**Project:** FIELDWISE AI - NASA Space Apps Challenge 2026, "Field Shift: Adapting Farms with NASA Data"
+**Project:** Kyro - NASA Space Apps Challenge 2026, "Field Shift: Adapting Farms with NASA Data"
 **Stack:** Python 3.11, Streamlit, Plotly, Folium + streamlit-folium, pandas, requests
 
 ## 1. Goal

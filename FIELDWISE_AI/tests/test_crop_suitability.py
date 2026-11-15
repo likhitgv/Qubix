@@ -1,5 +1,5 @@
 
-"""Tests for FIELDWISE AI Member 3 crop suitability engine."""
+"""Tests for Kyro Member 3 crop suitability engine."""
 
 import unittest
 

@@ -1,4 +1,4 @@
-"""FIELDWISE AI - M5 Crop Suitability Engine.
+"""Kyro - M5 Crop Suitability Engine.
 
 Uses transparent rule-based scoring against the crop reference database.
 Environmental values and farmer inputs must be supplied by the caller.

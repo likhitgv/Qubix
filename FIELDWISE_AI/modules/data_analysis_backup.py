@@ -1,6 +1,6 @@
 
 """
-FIELDWISE AI - Environmental Data Analysis Module
+Kyro - Environmental Data Analysis Module
 """
 
 import pandas as pd
